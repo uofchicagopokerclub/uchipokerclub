@@ -162,6 +162,55 @@ ok("subscribe honeypot writes nothing", () => {
 });
 ok("the mailing list never appears in the public feed", () => assert.ok(!JSON.stringify(get()).includes("example.com")));
 ok("setup creates the Mailing list tab with headers", () => eq(G.__list().g[0], ["First Name", "Last Name", "Email", "Joined", "Source"]));
+console.log(" sponsor inquiries");
+const sponsor = (o) => post(Object.assign({ action: "sponsor" }, o));
+ok("sponsor inquiry is saved and emailed to the club with Reply-To set to the sponsor", () => {
+  const r = sponsor({ name: "Pat Recruiter", company: "D. E. Shaw & Co.", email: "Pat@DEShaw.com", message: "We would like the 2026-2027 prospectus." });
+  eq([r.ok, r.name], [true, "Pat Recruiter"]);
+  const row = G.__sponsors().g[1];
+  eq([row[1], row[2], row[3], row[4], row[5]], ["Pat Recruiter", "D. E. Shaw & Co.", "pat@deshaw.com", "We would like the 2026-2027 prospectus.", "website"]);
+  const m = G.__sent.at(-1);
+  eq([m.to, m.replyTo, m.subject], ["UofChicagoPokerClub@gmail.com", "pat@deshaw.com", "Sponsor inquiry: D. E. Shaw & Co."]);
+  assert.ok(m.body.includes("We would like the 2026-2027 prospectus."));
+});
+ok("sponsor validation: name, company, email, message length", () => {
+  assert.strictEqual(sponsor({ name: "", company: "X", email: "a@b.co" }).field, "name");
+  assert.strictEqual(sponsor({ name: "Pat", company: "", email: "a@b.co" }).field, "company");
+  assert.strictEqual(sponsor({ name: "Pat", company: "=HYPERLINK(1)", email: "a@b.co" }).field, "company");
+  assert.strictEqual(sponsor({ name: "Pat", company: "Acme", email: "not-an-email" }).field, "email");
+  assert.strictEqual(sponsor({ name: "Pat", company: "Acme", email: "a@b.co", message: "x".repeat(1001) }).field, "message");
+});
+ok("a message that looks like a formula is stored as text", () => {
+  sponsor({ name: "Pat", company: "Acme", email: "a@b.co", message: '=IMPORTXML("http://x", A1)' });
+  const sh = G.__sponsors();
+  assert.strictEqual(sh.g[sh.getLastRow() - 1][4], '=IMPORTXML("http://x", A1)');
+});
+ok("sponsor honeypot saves and sends nothing", () => {
+  const rows = G.__sponsors().getLastRow(), sent = G.__sent.length;
+  assert.strictEqual(sponsor({ name: "Bot", company: "Bot", email: "bot@x.com", website: "spam" }).ok, true);
+  eq([G.__sponsors().getLastRow(), G.__sent.length], [rows, sent]);
+});
+ok("if the alert email fails, the inquiry is still saved and logged", () => {
+  G.__mailFails = true;
+  const rows = G.__sponsors().getLastRow();
+  assert.strictEqual(sponsor({ name: "Sam", company: "Citadel", email: "sam@citadel.com" }).ok, true);
+  G.__mailFails = false;
+  assert.strictEqual(G.__sponsors().getLastRow(), rows + 1);
+  assert.ok(G.__log().g.slice(-1)[0][1] === "sponsor alert failed");
+});
+ok("sponsor inquiries are capped per hour", () => {
+  let capped = 0;
+  for (let i = 0; i < 25; i++) if (/Too many inquiries/.test(sponsor({ name: "Cap", company: "Cap", email: "c" + i + "@x.com" }).error || "")) capped++;
+  assert.ok(capped > 0);
+});
+ok("sponsor details never appear in the public feed", () => assert.ok(!JSON.stringify(get()).includes("deshaw")));
+ok("the board tool defaults to a 10,000 chip starting stack, and a saved 0 sticks", () => {
+  G.__props.delete("startingStack");
+  assert.strictEqual(G.getAdminData_().startingStack, 10000);
+  G.__props.set("startingStack", "0");
+  assert.strictEqual(G.getAdminData_().startingStack, 0);
+  G.__props.set("startingStack", "10000");
+});
 ok("anonymous flood is cut off but the board still gets through", () => {
   let busy = 0;
   for (let i = 0; i < 320; i++) if (/busy/.test(post({ action: "load", key: "nope" }).error || "")) busy++;

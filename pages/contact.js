@@ -1,8 +1,8 @@
 import Seo from '../components/Seo';
+import SponsorForm from '../components/SponsorForm';
 import { club, contact } from '../content/club';
 
 export default function Contact() {
-  const prospectus = `mailto:${club.email}?subject=${encodeURIComponent(contact.prospectusSubject)}`;
   return (
     <>
       <Seo
@@ -39,15 +39,13 @@ export default function Contact() {
         </div>
       </section>
 
-      <section className="section" aria-labelledby="sponsor-title" style={{ paddingTop: 'var(--section)' }}>
+      <section className="section" id="sponsor" aria-labelledby="sponsor-title" style={{ paddingTop: 'var(--section)' }}>
         <div className="wrap split">
-          <h2 id="sponsor-title" className="section-title">{contact.sponsorTitle}</h2>
           <div>
-            <p className="lead" style={{ maxWidth: '46ch' }}>{contact.sponsorText}</p>
-            <div className="actions">
-              <a className="btn btn-primary" href={prospectus}>Request the prospectus</a>
-            </div>
+            <h2 id="sponsor-title" className="section-title">{contact.sponsorTitle}</h2>
+            <p className="lead" style={{ marginTop: 18, maxWidth: '40ch' }}>{contact.sponsorText}</p>
           </div>
+          <SponsorForm />
         </div>
       </section>
     </>

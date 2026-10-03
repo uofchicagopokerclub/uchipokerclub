@@ -61,7 +61,9 @@ export default function Home({ feed, connected, now }) {
                 </li>
               ))}
             </ul>
-            <p className="sponsor-note">{sponsors.note}</p>
+            <p className="sponsor-note">
+              {sponsors.note} <Link className="text-link" href="/contact#sponsor">{sponsors.cta}</Link>
+            </p>
           </div>
         </div>
       </section>

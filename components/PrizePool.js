@@ -19,6 +19,7 @@ export function PrizePanel() {
           </li>
         ))}
       </ol>
+      <p className="pool-note">{ledger.prizeNote}</p>
     </section>
   );
 }
@@ -35,7 +36,7 @@ export function PrizeLine() {
           </li>
         ))}
       </ol>
-      <p className="prize-total">{money(total())} ledger prize pool</p>
+      <p className="prize-total">{money(total())} ledger prize pool. {ledger.prizeNote}</p>
     </>
   );
 }

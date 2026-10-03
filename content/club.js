@@ -26,6 +26,7 @@ export const ledger = {
   years: YEARS,
   payouts: [400, 225, 150, 100, 75, 50],
   rowsBeforeShowAll: 25,
+  prizeNote: 'The top 6 at the end of the term receive Visa gift cards.',
   explainer: 'Paper profit and loss. Stacks reset every week and the ledger carries over. No money is wagered at any point. Chips are for scoring only.',
 };
 
@@ -55,23 +56,23 @@ export const home = {
       text: 'A room full of people who want to get better at the same game. No experience needed to walk in.',
     },
   ],
-  ledgerText: 'Everyone starts with the same stack of chips each week. We record what you finish the night with and add it to a running ledger.',
+  ledgerText: 'Every member starts each meeting with 10,000 chips. A board member verifies final stacks and records each result here, and results add up across the term.',
 };
 
 export const cohort = {
   title: 'Advanced cohort',
-  lead: 'At the end of the term we select roughly 25 students for the advanced cohort.',
+  lead: 'After the Fall term we select roughly 25 students for the advanced cohort.',
   text: 'The club is open to all students through weekly workshops and free-roll tournaments designed to sharpen analytical thinking and decision-making skills.',
   get: [
-    'Your resume goes to our partner quant firms as part of the cohort resume book.',
-    'Automatic entry into every club tournament, with no satellite required.',
-    'Smaller sessions that go deeper on strategy than the weekly lectures.',
-    'Invitations to co-branded tournaments, info sessions, and coffee chats with our sponsors.',
+    'Priority access to all future tournaments and events.',
+    'Your resume goes to our corporate sponsors.',
+    'Custom merch.',
+    'Special tournaments.',
   ],
   select: [
-    "Members from last year's cohort get priority.",
-    'After that it comes down to engagement across the Fall term.',
-    'We are looking for people who show up, ask questions in lectures, and are curious about the game.',
+    'Selection is based mainly on engagement and participation at Fall events.',
+    'There is a short application.',
+    "Participation in last year's advanced cohort is also taken into account.",
   ],
 };
 
@@ -85,21 +86,21 @@ export const about = {
   // Source: the club's 2026-2027 sponsorship prospectus.
   facts: [
     { value: 'Winter 2024', label: 'Founded' },
-    { value: '350+', label: 'Students on the mailing list in 2025-2026' },
+    { value: '430+', label: 'Students on the mailing list, Fall 2026' },
     { value: 'About 40', label: 'Members of the 2025-2026 advanced cohort' },
   ],
   meeting: [
     {
-      title: 'Lecture, first ~45 minutes',
-      text: 'A board member walks through key concepts. Bring questions. Everything is built to be followed from your first week.',
+      title: 'Lecture, first 35 minutes',
+      text: 'A board member walks through key concepts and strategy. Bring questions. Everything is built to be followed from your first week.',
     },
     {
       title: 'Live play',
-      text: 'Everyone starts with the same stack of chips each week.',
+      text: 'Every member starts each session with 10,000 chips.',
     },
     {
       title: 'Paper profit and loss',
-      text: 'We record what you finish the night with and add it to a running ledger. Stacks reset every week and the ledger carries over.',
+      text: "A board member verifies final stacks and records each player's result in the ledger on this site. Stacks reset every week, and results add up across the term.",
     },
   ],
 };
@@ -109,11 +110,11 @@ export const schedule = {
   meetings: [
     { date: '2026-10-09', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-10-16', start: '18:00', end: '20:00', place: 'Reynolds Club, McCormick Tribune Lounge', what: 'Weekly meeting' },
-    { date: '2026-10-22', start: '17:45', end: '20:15', place: 'Ida Noyes Hall', what: 'Bid or Bluff with SIG', event: true },
+    { date: '2026-10-22', start: '18:30', end: '20:00', place: 'Ida Noyes Hall, Library and Lounge', what: 'Bid or Bluff with Susquehanna', event: true },
     { date: '2026-10-23', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-10-30', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-06', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
-    { date: '2026-11-08', start: '10:30', end: '13:30', place: 'Ida Noyes Hall', what: 'Fall tournament', event: true },
+    { date: '2026-11-08', start: '10:30', end: '13:30', place: 'Ida Noyes Hall, Library and Lounge', what: 'Fall tournament', event: true },
     { date: '2026-11-13', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-20', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
   ],
@@ -123,10 +124,11 @@ export const schedule = {
 export const events = [
   {
     date: '2026-10-22',
-    title: 'Bid or Bluff with SIG',
+    title: 'Bid or Bluff with Susquehanna',
     points: [
-      'Susquehanna brings its own game to campus.',
-      'Selection and sign-up details will come out soon.',
+      'An evening of food, networking, and competition with Susquehanna for a select group of UChicago students.',
+      'Bid or Bluff is a fast-paced game of strategy, deduction, and nerve. Prizes include a Nintendo Switch 2.',
+      'Apply with your resume by October 13 through the link in the club email. Selected attendees get the details.',
     ],
   },
   {
@@ -134,8 +136,8 @@ export const events = [
     title: 'Fall tournament',
     points: [
       '48 seats. Some are selected by the board. The rest are won through an online satellite that anyone in the club can enter.',
-      'Satellite date to be announced.',
       'A $1,000 prize pool paid out to the final table.',
+      'Registration details are coming soon.',
     ],
   },
 ];
@@ -160,6 +162,7 @@ export const board = {
 export const sponsors = {
   heading: '2025-2026 sponsors',
   note: 'These firms sponsored the club in 2025 to 2026. Sponsors for this year are being finalized.',
+  cta: 'Become a sponsor',
   firms: [
     { name: 'Jane Street', logo: '/images/sponsors/jane-street.png', width: 424, height: 155, displayHeight: 40 },
     { name: 'Citadel', logo: '/images/sponsors/citadel.png', width: 350, height: 198, displayHeight: 48 },
@@ -183,8 +186,7 @@ export const gallery = [
 export const contact = {
   title: 'Interested in learning more or becoming a sponsor?',
   sponsorTitle: 'Become a sponsor',
-  sponsorText: 'Our 2026-2027 sponsorship prospectus covers partnership options and who our members are. Email us and we will send it over.',
-  prospectusSubject: 'Sponsorship prospectus request',
+  sponsorText: 'Our 2026-2027 sponsorship prospectus covers partnership options and who our members are. Leave your details and a member of the board will reach out.',
 };
 
 export const mailingList = {

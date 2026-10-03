@@ -294,6 +294,7 @@ select.input {
   background-size: 5px 5px; background-repeat: no-repeat; padding-right: 36px;
 }
 .form { display: grid; gap: 18px; }
+.textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .form-error { font-weight: 600; color: var(--neg); }
 .form-ok { padding: 22px; border-left: 4px solid var(--maroon); background: var(--tint); }
 .form-ok h2, .form-ok h3 { font-size: 1.375rem; }
@@ -328,6 +329,7 @@ select.input {
 .prize-panel li + li { border-left: 1px solid rgba(255, 255, 255, 0.18); }
 .prize-panel li span { font-size: 0.75rem; color: rgba(255, 255, 255, 0.85); }
 .prize-panel li b { font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+.prize-panel .pool-note { grid-column: 1 / -1; font-size: 0.8125rem; color: rgba(255, 255, 255, 0.85); }
 @media (max-width: 719px) {
   .prize-panel { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .prize-panel ol { grid-template-columns: repeat(3, minmax(0, 1fr)); border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.35); padding-top: 10px; row-gap: 10px; }

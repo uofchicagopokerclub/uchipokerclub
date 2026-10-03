@@ -38,6 +38,7 @@ function makeEnv() {
     },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: s => ({ s, setMimeType() { return this; }, getContent() { return s; } }) },
     HtmlService: { createHtmlOutput: () => ({ setWidth() { return this; }, setHeight() { return this; } }) },
+    MailApp: { sendEmail(msg) { if (ctx.__mailFails) throw new Error("Service invoked too many times"); ctx.__sent.push(msg); } },
   };
   vm.createContext(ctx);
   const codePath = process.env.CODE_GS || path.join(__dirname, "..", "Code.gs");
@@ -45,6 +46,9 @@ function makeEnv() {
   ctx.__sheet = () => sheets.Players;
   ctx.__log = () => sheets.Log;
   ctx.__list = () => sheets["Mailing list"];
+  ctx.__sponsors = () => sheets["Sponsor inquiries"];
+  ctx.__sent = [];
+  ctx.__mailFails = false;
   ctx.__props = props;
   ctx.__cache = cache;
   return ctx;

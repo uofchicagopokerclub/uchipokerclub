@@ -13,7 +13,8 @@
 
 - Facts come from the club's own material: the Fall 2026 info session deck, the 2026-2027 sponsorship
   prospectus, and the previous site. No invented numbers, quotes, logos, dates, or members.
-- Stats carry their year (350+ on the mailing list in 2025-2026, about 40 in the 2025-2026 advanced cohort).
+- Stats carry their date (430+ on the mailing list in Fall 2026, about 40 in the 2025-2026 advanced cohort).
+- The Fall 2026 schedule, chip stacks, prizes, and cohort rules follow the board's official Fall schedule email (2026-10-03).
 - Sponsors appear only as past sponsors with the disclaimer, until a new year's sponsors are confirmed.
 - No sponsorship prices on the site. They live in the prospectus.
 - The disclaimer "No money is wagered at any point. Chips are for scoring only." appears in the footer and on

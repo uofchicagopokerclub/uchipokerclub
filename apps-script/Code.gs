@@ -21,6 +21,8 @@
   - Recording results needs the board password: a generated 96-bit secret, stored only as a SHA-256 hash.
     Requests with the right password are never rate limited, so a flood cannot lock the board out.
   - Changing the password or code needs edit access to this Sheet (your Google login).
+  - Sponsor inquiries from the Contact page go to the Sponsor inquiries tab and are emailed to the club
+    inbox with Reply-To set to the sponsor. Capped per hour.
   - Mailing-list sign-ups from the site footer go to the Mailing list tab: any email, de-duplicated,
     capped, and never readable from the web.
   - Every write lands in the Log tab. File > Version history restores anything.
@@ -32,6 +34,9 @@ var TERM = "Fall 2026";
 var SHEET_NAME = "Players";
 var LOG_NAME = "Log";
 var LIST_NAME = "Mailing list";
+var SPONSOR_NAME = "Sponsor inquiries";
+// Sponsor inquiries from the Contact page are emailed here as they arrive. Reply goes straight to the sponsor.
+var LEAD_ALERT_TO = "UofChicagoPokerClub@gmail.com";
 var FIXED = ["Name", "Email", "Year", "Joined", "Source"]; // columns A to E; weeks start at F
 var WEEKS = ["Oct 9", "Oct 16", "Oct 23", "Oct 30", "Nov 6", "Nov 13", "Nov 20"];
 var EMAIL_DOMAIN = "uchicago.edu"; // set to "" to accept any email address
@@ -39,6 +44,9 @@ var YEARS = ["2027", "2028", "2029", "2030", "Other"];
 var CACHE_KEY = "standings";
 var MAX_PLAYERS = 3000;      // sign-ups stop past this many rows
 var MAX_SUBSCRIBERS = 20000; // mailing-list rows
+var MAX_SPONSOR_ROWS = 5000;  // sponsor inquiry rows
+var SPONSORS_PER_HOUR = 20;  // keeps a flood from burying the club inbox
+var STARTING_STACK = 10000;  // chips each member starts a meeting with (Fall 2026 schedule email)
 var MAX_BODY = 100000;       // bytes per request
 var MAX_CHIPS = 10000000;    // largest result accepted for one night
 var ANON_PER_MINUTE = 300;   // sign-ups plus wrong-password requests, combined
@@ -70,6 +78,7 @@ function setupSheet() {
   sheet.setFrozenColumns(1);
   logSheet_();
   listSheet_();
+  sponsorSheet_();
   ss.toast("Ledger sheet is ready.", "Ledger");
 }
 
@@ -146,6 +155,10 @@ function doPost(e) {
     // Only unauthenticated traffic is throttled: a flood can slow sign-ups but never blocks the board.
     if (action === "join") return json_(allow_("anon", ANON_PER_MINUTE, 60) ? join_(data) : busy);
     if (action === "subscribe") return json_(allow_("anon", ANON_PER_MINUTE, 60) ? subscribe_(data) : busy);
+    if (action === "sponsor") {
+      var open = allow_("anon", ANON_PER_MINUTE, 60) && allow_("sponsor", SPONSORS_PER_HOUR, 3600);
+      return json_(open ? sponsor_(data) : { ok: false, error: "Too many inquiries right now. Email " + LEAD_ALERT_TO + " instead." });
+    }
 
     var denied = checkBoardPassword_(data.key);
     if (denied) return json_(allow_("anon", ANON_PER_MINUTE, 60) ? { ok: false, auth: true, error: denied } : busy);
@@ -252,6 +265,64 @@ function listSheet_() {
   return sheet;
 }
 
+/* ---------- Sponsor inquiries ---------- */
+
+// Contact page form: name, company, work email, optional message. Saved first, then emailed, so a mail
+// problem never loses an inquiry.
+var COMPANY_RE = /^[\p{L}\p{N}][\p{L}\p{N} &.,'\u2019()\/+-]*$/u;
+
+function sponsor_(data) {
+  if (data.website) return { ok: true }; // honeypot
+  var name = validPersonName_(data.name, 60);
+  if (name.error) return { ok: false, field: "name", error: name.error };
+  var company = clean_(data.company);
+  if (!company) return { ok: false, field: "company", error: "Enter your company." };
+  if (company.length > 80 || !COMPANY_RE.test(company)) {
+    return { ok: false, field: "company", error: "Use letters, numbers, spaces and basic punctuation, up to 80 characters." };
+  }
+  var email = clean_(data.email).toLowerCase();
+  var emailOk = /^[a-z0-9][a-z0-9._%+-]*@[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(email) && email.length <= 120;
+  if (!emailOk) return { ok: false, field: "email", error: "Enter a valid email address." };
+  var message = clean_(data.message);
+  if (message.length > 1000) return { ok: false, field: "message", error: "Keep the message under 1,000 characters." };
+
+  var saved = withLock_(function () {
+    var sheet = sponsorSheet_();
+    if (sheet.getLastRow() - 1 >= MAX_SPONSOR_ROWS) return false;
+    sheet.appendRow([new Date(), safe_(name.value), safe_(company), safe_(email), safe_(message), "website"]);
+    return true;
+  });
+  if (!saved) return { ok: false, error: "Please email " + LEAD_ALERT_TO + " instead." };
+  log_("sponsor inquiry", company, "contact form");
+
+  try {
+    MailApp.sendEmail({
+      to: LEAD_ALERT_TO,
+      replyTo: email,
+      subject: "Sponsor inquiry: " + company,
+      body: "New sponsor inquiry from uchipokerclub.com\n\n" +
+        "Name: " + name.value + "\nCompany: " + company + "\nEmail: " + email + "\n" +
+        (message ? "Message: " + message + "\n" : "") +
+        "\nReply to this email to reach them. Every inquiry is also in the " + SPONSOR_NAME + " tab of the ledger Sheet."
+    });
+  } catch (err) {
+    log_("sponsor alert failed", String(err && err.message || err).slice(0, 200), "contact form");
+  }
+  return { ok: true, name: name.value };
+}
+
+function sponsorSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SPONSOR_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SPONSOR_NAME);
+    sheet.getRange(1, 1, 1, 6).setValues([["When", "Name", "Company", "Email", "Message", "Source"]]).setFontWeight("bold");
+    sheet.getRange(1, 2, sheet.getMaxRows(), 5).setNumberFormat("@");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
 /* ---------- Board actions (board password required) ---------- */
 
 function getAdminData_() {
@@ -264,7 +335,8 @@ function getAdminData_() {
     term: TERM,
     weeks: t.weeks,
     defaultWeek: t.weeks[firstEmpty >= 0 ? firstEmpty : t.weeks.length - 1] || "",
-    startingStack: Number(props_().getProperty("startingStack")) || 0,
+    // A saved 0 means "type profit or loss directly", so only a missing value falls back to the default.
+    startingStack: startingStack_(),
     players: t.players.map(function (p) { return { name: p.name, results: p.results }; }) // never emails
   };
 }
@@ -306,6 +378,11 @@ function saveWeek_(week, entries, startingStack, by) {
     log_("results", t.weeks[w] + ": " + saved + " saved, " + cleared + " cleared", by);
     return { ok: true, saved: saved, cleared: cleared, missing: missing, week: t.weeks[w] };
   });
+}
+
+function startingStack_() {
+  var saved = props_().getProperty("startingStack");
+  return saved === null ? STARTING_STACK : Number(saved) || 0;
 }
 
 function addPlayer_(name, by) {
