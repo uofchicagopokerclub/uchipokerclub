@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /ledger/record
+
+Sitemap: https://www.uchipokerclub.com/sitemap.xml
