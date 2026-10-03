@@ -146,7 +146,7 @@ export const events = [
 export const board = {
   season: '2026-2027',
   members: [
-    { name: 'Max Lacombe', role: 'Co-President', year: '2028', photo: '/images/board/max-lacombe.webp' },
+    { name: 'Max Lacombe', role: 'Co-President', year: '2028', photo: '/images/board/max-lacombe-2.webp' },
     { name: 'Zach Khambatta', role: 'Co-President', year: '2028', photo: '/images/board/zach-khambatta.webp' },
     { name: 'Levi Stein', role: 'Co-Head of Education', year: '2028', photo: '/images/board/levi-stein.webp' },
     { name: "Tad O'Brien", role: 'Co-Head of Education', year: '2028', photo: '/images/board/tad-obrien.webp' },
