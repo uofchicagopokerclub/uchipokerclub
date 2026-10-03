@@ -26,6 +26,7 @@ The Google Sheet is the database. Its Apps Script (`apps-script/Code.gs`) is a s
 | `GET` | Anyone | Names and weekly results of people who have played. Never emails. |
 | `POST join` | Anyone with the sign-up code | Adds a member to the Players tab |
 | `POST subscribe` | Anyone | Adds a row to the Mailing list tab (footer form) |
+| `POST sponsor` | Anyone, capped per hour | Adds a row to the Sponsor inquiries tab (Contact page). Nothing is emailed |
 | `POST load`, `save`, `addPlayer` | Board password only | The results tool at `/ledger/record` |
 
 The home page and `/ledger` are rebuilt in the background at most every 60 seconds, so standings update without

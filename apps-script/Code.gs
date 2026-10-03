@@ -21,8 +21,8 @@
   - Recording results needs the board password: a generated 96-bit secret, stored only as a SHA-256 hash.
     Requests with the right password are never rate limited, so a flood cannot lock the board out.
   - Changing the password or code needs edit access to this Sheet (your Google login).
-  - Sponsor inquiries from the Contact page go to the Sponsor inquiries tab and are emailed to the club
-    inbox with Reply-To set to the sponsor. Capped per hour.
+  - Sponsor inquiries from the Contact page are saved to the Sponsor inquiries tab, capped per hour.
+    Nothing is emailed: the script has no permission to send mail.
   - Mailing-list sign-ups from the site footer go to the Mailing list tab: any email, de-duplicated,
     capped, and never readable from the web.
   - Every write lands in the Log tab. File > Version history restores anything.
@@ -35,8 +35,8 @@ var SHEET_NAME = "Players";
 var LOG_NAME = "Log";
 var LIST_NAME = "Mailing list";
 var SPONSOR_NAME = "Sponsor inquiries";
-// Sponsor inquiries from the Contact page are emailed here as they arrive. Reply goes straight to the sponsor.
-var LEAD_ALERT_TO = "UofChicagoPokerClub@gmail.com";
+// Shown to visitors when a form cannot take their details. This script never sends email.
+var CLUB_EMAIL = "UofChicagoPokerClub@gmail.com";
 var FIXED = ["Name", "Email", "Year", "Joined", "Source"]; // columns A to E; weeks start at F
 var WEEKS = ["Oct 9", "Oct 16", "Oct 23", "Oct 30", "Nov 6", "Nov 13", "Nov 20"];
 var EMAIL_DOMAIN = "uchicago.edu"; // set to "" to accept any email address
@@ -157,7 +157,7 @@ function doPost(e) {
     if (action === "subscribe") return json_(allow_("anon", ANON_PER_MINUTE, 60) ? subscribe_(data) : busy);
     if (action === "sponsor") {
       var open = allow_("anon", ANON_PER_MINUTE, 60) && allow_("sponsor", SPONSORS_PER_HOUR, 3600);
-      return json_(open ? sponsor_(data) : { ok: false, error: "Too many inquiries right now. Email " + LEAD_ALERT_TO + " instead." });
+      return json_(open ? sponsor_(data) : { ok: false, error: "Too many inquiries right now. Email " + CLUB_EMAIL + " instead." });
     }
 
     var denied = checkBoardPassword_(data.key);
@@ -267,8 +267,8 @@ function listSheet_() {
 
 /* ---------- Sponsor inquiries ---------- */
 
-// Contact page form: name, company, work email, optional message. Saved first, then emailed, so a mail
-// problem never loses an inquiry.
+// Contact page form: name, company, work email, optional message. Saved to the Sponsor inquiries tab
+// for the board to follow up from. Nothing is emailed.
 var COMPANY_RE = /^[\p{L}\p{N}][\p{L}\p{N} &.,'\u2019()\/+-]*$/u;
 
 function sponsor_(data) {
@@ -292,22 +292,8 @@ function sponsor_(data) {
     sheet.appendRow([new Date(), safe_(name.value), safe_(company), safe_(email), safe_(message), "website"]);
     return true;
   });
-  if (!saved) return { ok: false, error: "Please email " + LEAD_ALERT_TO + " instead." };
+  if (!saved) return { ok: false, error: "Please email " + CLUB_EMAIL + " instead." };
   log_("sponsor inquiry", company, "contact form");
-
-  try {
-    MailApp.sendEmail({
-      to: LEAD_ALERT_TO,
-      replyTo: email,
-      subject: "Sponsor inquiry: " + company,
-      body: "New sponsor inquiry from uchipokerclub.com\n\n" +
-        "Name: " + name.value + "\nCompany: " + company + "\nEmail: " + email + "\n" +
-        (message ? "Message: " + message + "\n" : "") +
-        "\nReply to this email to reach them. Every inquiry is also in the " + SPONSOR_NAME + " tab of the ledger Sheet."
-    });
-  } catch (err) {
-    log_("sponsor alert failed", String(err && err.message || err).slice(0, 200), "contact form");
-  }
   return { ok: true, name: name.value };
 }
 

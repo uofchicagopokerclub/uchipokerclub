@@ -164,14 +164,16 @@ ok("the mailing list never appears in the public feed", () => assert.ok(!JSON.st
 ok("setup creates the Mailing list tab with headers", () => eq(G.__list().g[0], ["First Name", "Last Name", "Email", "Joined", "Source"]));
 console.log(" sponsor inquiries");
 const sponsor = (o) => post(Object.assign({ action: "sponsor" }, o));
-ok("sponsor inquiry is saved and emailed to the club with Reply-To set to the sponsor", () => {
+ok("sponsor inquiry is saved to the Sponsor inquiries tab and nothing is emailed", () => {
   const r = sponsor({ name: "Pat Recruiter", company: "D. E. Shaw & Co.", email: "Pat@DEShaw.com", message: "We would like the 2026-2027 prospectus." });
   eq([r.ok, r.name], [true, "Pat Recruiter"]);
   const row = G.__sponsors().g[1];
   eq([row[1], row[2], row[3], row[4], row[5]], ["Pat Recruiter", "D. E. Shaw & Co.", "pat@deshaw.com", "We would like the 2026-2027 prospectus.", "website"]);
-  const m = G.__sent.at(-1);
-  eq([m.to, m.replyTo, m.subject], ["UofChicagoPokerClub@gmail.com", "pat@deshaw.com", "Sponsor inquiry: D. E. Shaw & Co."]);
-  assert.ok(m.body.includes("We would like the 2026-2027 prospectus."));
+  assert.strictEqual(G.__sent.length, 0);
+});
+ok("Code.gs has no way to send email", () => {
+  const src = require("fs").readFileSync(require("path").join(__dirname, "..", "Code.gs"), "utf8");
+  assert.ok(!/MailApp|GmailApp|sendEmail/.test(src));
 });
 ok("sponsor validation: name, company, email, message length", () => {
   assert.strictEqual(sponsor({ name: "", company: "X", email: "a@b.co" }).field, "name");
@@ -185,18 +187,14 @@ ok("a message that looks like a formula is stored as text", () => {
   const sh = G.__sponsors();
   assert.strictEqual(sh.g[sh.getLastRow() - 1][4], '=IMPORTXML("http://x", A1)');
 });
-ok("sponsor honeypot saves and sends nothing", () => {
-  const rows = G.__sponsors().getLastRow(), sent = G.__sent.length;
-  assert.strictEqual(sponsor({ name: "Bot", company: "Bot", email: "bot@x.com", website: "spam" }).ok, true);
-  eq([G.__sponsors().getLastRow(), G.__sent.length], [rows, sent]);
-});
-ok("if the alert email fails, the inquiry is still saved and logged", () => {
-  G.__mailFails = true;
+ok("sponsor honeypot saves nothing", () => {
   const rows = G.__sponsors().getLastRow();
-  assert.strictEqual(sponsor({ name: "Sam", company: "Citadel", email: "sam@citadel.com" }).ok, true);
-  G.__mailFails = false;
-  assert.strictEqual(G.__sponsors().getLastRow(), rows + 1);
-  assert.ok(G.__log().g.slice(-1)[0][1] === "sponsor alert failed");
+  assert.strictEqual(sponsor({ name: "Bot", company: "Bot", email: "bot@x.com", website: "spam" }).ok, true);
+  assert.strictEqual(G.__sponsors().getLastRow(), rows);
+});
+ok("each inquiry is logged by company", () => {
+  sponsor({ name: "Sam", company: "Citadel", email: "sam@citadel.com" });
+  assert.ok(G.__log().g.slice(-1)[0].slice(1, 3).join(" | ") === "sponsor inquiry | Citadel");
 });
 ok("sponsor inquiries are capped per hour", () => {
   let capped = 0;

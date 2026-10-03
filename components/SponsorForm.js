@@ -5,8 +5,8 @@ import { endSentence } from '../lib/ledger';
 
 const EMPTY = { name: '', company: '', email: '', message: '', website: '' };
 
-// Sponsor inquiries land in the "Sponsor inquiries" tab of the club Sheet, and the club inbox gets an
-// email with Reply-To set to the sponsor. Field names are the Apps Script contract: do not rename them.
+// Sponsor inquiries land in the "Sponsor inquiries" tab of the club Sheet for the board to follow up.
+// Nothing is emailed. Field names are the Apps Script contract: do not rename them.
 export default function SponsorForm() {
   const [values, setValues] = useState(EMPTY);
   const [errors, setErrors] = useState({});
