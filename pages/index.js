@@ -21,7 +21,7 @@ export default function Home({ feed, connected, now }) {
   return (
     <>
       <Seo
-        description="The University of Chicago's undergraduate poker club: a weekly strategy lecture, live play, a running ledger, and events with top quantitative trading firms."
+        description="The University of Chicago's undergraduate poker club: a weekly strategy lecture, live play, a running ledger, and recruiting events with our sponsors."
         path="/"
       />
 

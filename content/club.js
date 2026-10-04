@@ -49,7 +49,7 @@ export const home = {
     },
     {
       title: 'Professional opportunities',
-      text: 'We partner with the quant trading firms that recruit hardest at UChicago. They run events with us, meet members in person, and receive the advanced cohort resume book at the end of the term.',
+      text: 'Recruiting opportunities from our sponsors. They run events with us, meet members in person, and receive the advanced cohort resume book at the end of the term.',
     },
     {
       title: 'Community',
@@ -135,7 +135,7 @@ export const events = [
     date: '2026-11-08',
     title: 'Fall tournament',
     points: [
-      '48 seats. Some are selected by the board. The rest are won through an online satellite that anyone in the club can enter.',
+      '48 seats. Some are selected from the advanced cohort. The rest are won through an online satellite that anyone in the club can enter.',
       'A $1,000 prize pool paid out to the final table.',
       'Registration details are coming soon.',
     ],
