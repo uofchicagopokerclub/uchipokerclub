@@ -314,7 +314,7 @@ export default function RecordResults() {
       <div className="find">
         <label className="sr-only" htmlFor="find-player">Find or add a player</label>
         <input
-          id="find-player" ref={findRef} className="input" placeholder="Find or add a player" autoComplete="off" spellCheck="false"
+          id="find-player" ref={findRef} className="input" placeholder="Find or add a player" autoComplete="off" autoCapitalize="words" autoCorrect="off" spellCheck="false"
           value={query} onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return;
@@ -348,8 +348,9 @@ export default function RecordResults() {
                   <tr key={`${p.name}#${i}`} className={[changed ? 'changed' : '', n.bad ? 'bad' : ''].join(' ').trim() || undefined}>
                     <td className="nm">{p.name}</td>
                     <td className="in">
+                      {/* The iPhone number pad has no minus key, so profit or loss entries, which can be negative, get the full keyboard. */}
                       <input
-                        className="input" inputMode="numeric" autoComplete="off" aria-label={p.name} value={text}
+                        className="input" inputMode={start ? 'numeric' : 'text'} enterKeyHint="next" autoComplete="off" aria-label={p.name} value={text}
                         onChange={(e) => { const v = e.target.value; setEdits((m) => new Map(m).set(nameKey(p.name), v)); }}
                         onKeyDown={onEntryKey}
                       />

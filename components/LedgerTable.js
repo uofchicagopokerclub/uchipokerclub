@@ -101,7 +101,7 @@ export default function LedgerTable({ standings, status }) {
         <label className="search">
           <span className="sr-only">Find a player</span>
           <SearchIcon />
-          <input className="input" type="search" placeholder="Find a player" autoComplete="off" spellCheck="false" value={q} onChange={(e) => setQ(e.target.value)} disabled={status !== 'ready'} />
+          <input className="input" type="search" placeholder="Find a player" autoComplete="off" autoCorrect="off" spellCheck="false" value={q} onChange={(e) => setQ(e.target.value)} disabled={status !== 'ready'} />
         </label>
         <span className="ledger-count" aria-live="polite">
           {query ? `${list.length} ${list.length === 1 ? 'match' : 'matches'}` : limited ? `Top ${limit} of ${total}` : ''}

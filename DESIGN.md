@@ -35,6 +35,9 @@ under titles, small tracked uppercase labels. The rules below are adapted from t
 - No em or en dashes in any file the site ships. The build fails otherwise.
 - Hero: headline of 2 lines or fewer, subtext of 20 words or fewer, buttons visible without scrolling, top
   padding 88px or less.
+- Phones: the hero copy and both buttons come before the photo. Anything tappable outside running text is at least
+  44px tall (`--tap`). A sent form's confirmation scrolls itself into view. Number fields that can go negative get the full keyboard, because
+  the iPhone number pad has no minus key.
 - At most one small uppercase label per three sections, never in consecutive sections.
 - One button label per intent: "See the schedule", "View the ledger", "Join the ledger", "Sign Up",
   "Request the prospectus".

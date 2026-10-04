@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { club } from '../content/club';
 import { postToLedger } from '../lib/api';
 import { endSentence } from '../lib/ledger';
+import FormSuccess from './FormSuccess';
 
 const EMPTY = { name: '', company: '', email: '', message: '', website: '' };
 
@@ -52,10 +53,10 @@ export default function SponsorForm() {
 
   if (sent) {
     return (
-      <div className="form-ok" role="status">
+      <FormSuccess>
         <h3>{endSentence(`Thanks, ${sent.name}`)}</h3>
         <p>A member of the board will reach out at {sent.email}.</p>
-      </div>
+      </FormSuccess>
     );
   }
 

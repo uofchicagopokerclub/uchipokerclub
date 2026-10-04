@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ledger } from '../content/club';
 import { postToLedger } from '../lib/api';
 import { endSentence } from '../lib/ledger';
+import FormSuccess from './FormSuccess';
 
 const YEARS = ledger.years;
 const DOMAIN = '@uchicago.edu';
@@ -63,11 +64,11 @@ export default function JoinLedgerForm() {
 
   if (joined) {
     return (
-      <div className="form-ok" role="status">
+      <FormSuccess>
         <h2>{endSentence(`You\u2019re on the ledger, ${joined}`)}</h2>
         <p>Your results show on the leaderboard after your first weekly meeting.</p>
         <button className="btn btn-secondary" type="button" onClick={again} style={{ marginTop: 16 }}>Sign up someone else</button>
-      </div>
+      </FormSuccess>
     );
   }
 
@@ -77,7 +78,7 @@ export default function JoinLedgerForm() {
     <form className="form" onSubmit={submit} noValidate>
       <label className="field">
         <span className="field-label">Sign-up code</span>
-        <input ref={refs.code} className="input" name="code" maxLength={20} autoComplete="off" autoCapitalize="characters" spellCheck="false" value={values.code} onChange={set('code')} aria-invalid={invalid('code')} aria-describedby="code-help" />
+        <input ref={refs.code} className="input" name="code" maxLength={20} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck="false" value={values.code} onChange={set('code')} aria-invalid={invalid('code')} aria-describedby="code-help" />
         <span className="field-help" id="code-help">The board shares it at meetings.</span>
         {errors.code && <span className="field-error">{errors.code}</span>}
       </label>
