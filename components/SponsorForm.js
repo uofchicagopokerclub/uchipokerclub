@@ -3,6 +3,7 @@ import { club } from '../content/club';
 import { postToLedger } from '../lib/api';
 import { endSentence } from '../lib/ledger';
 import FormSuccess from './FormSuccess';
+import SubmitButton from './SubmitButton';
 
 const EMPTY = { name: '', company: '', email: '', message: '', website: '' };
 
@@ -92,7 +93,7 @@ export default function SponsorForm() {
       </label>
       {formError && <p className="form-error" role="alert">{formError}</p>}
       <div>
-        <button className="btn btn-primary" type="submit" disabled={sending}>{sending ? 'Sending' : 'Request the prospectus'}</button>
+        <SubmitButton busy={sending} busyLabel="Sending">Request the prospectus</SubmitButton>
         <p className="field-help" style={{ marginTop: 10 }}>
           Prefer email? Write to <a className="text-link" href={`mailto:${club.email}`}>{club.email}</a>.
         </p>

@@ -56,7 +56,7 @@ export const home = {
       text: 'A room full of people who want to get better at the same game. No experience needed to walk in.',
     },
   ],
-  ledgerText: 'Every member starts each meeting with 10,000 chips. A board member verifies final stacks and records each result here, and results add up across the term.',
+  ledgerText: 'Every member starts each meeting with 10,000 chips. At the end you log your chips here, a board member checks your stack, and results add up across the term.',
 };
 
 export const cohort = {
@@ -100,7 +100,7 @@ export const about = {
     },
     {
       title: 'Paper profit and loss',
-      text: "A board member verifies final stacks and records each player's result in the ledger on this site. Stacks reset every week, and results add up across the term.",
+      text: 'At the end of the night you log your chips on this site, and a board member checks your stack and approves it. Stacks reset every week, and results add up across the term.',
     },
   ],
 };

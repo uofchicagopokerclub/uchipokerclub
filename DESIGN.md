@@ -39,8 +39,8 @@ under titles, small tracked uppercase labels. The rules below are adapted from t
   44px tall (`--tap`). A sent form's confirmation scrolls itself into view. Number fields that can go negative get the full keyboard, because
   the iPhone number pad has no minus key.
 - At most one small uppercase label per three sections, never in consecutive sections.
-- One button label per intent: "See the schedule", "View the ledger", "Join the ledger", "Sign Up",
-  "Request the prospectus".
+- One button label per intent: "See the schedule", "View the ledger", "Join the ledger", "Log my result",
+  "Sign Up", "Request the prospectus". Board tool: "Approve", "Reject", "Save code".
 - Sponsor row sits right under the hero, shows real logos only, with the deck's disclaimer word for word.
 - No scroll listeners. Every transition is inside `prefers-reduced-motion: no-preference`.
 - No `h-screen` or bare `100vh` for full-height sections.

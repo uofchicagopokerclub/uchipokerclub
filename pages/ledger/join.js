@@ -16,7 +16,7 @@ export default function JoinLedger() {
           <div className="ruled">
             <p className="eyebrow">{ledger.term}</p>
             <h1 className="page-title">Join the ledger</h1>
-            <p className="lead" style={{ marginTop: 18 }}>Sign up once. After each weekly meeting, your result is added to the running ledger.</p>
+            <p className="lead" style={{ marginTop: 18 }}>Sign up once. At each meeting, log your chips and a board member approves your result.</p>
           </div>
           <div className="split">
             <JoinLedgerForm />

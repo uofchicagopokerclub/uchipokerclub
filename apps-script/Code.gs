@@ -6,21 +6,25 @@
   1. Create a Google Sheet on the club Google account, and turn on 2-Step Verification for that account.
   2. Extensions > Apps Script. Replace Code.gs with this file. Save.
   3. Reload the Sheet. A "Ledger" menu appears.
-       Ledger > Set up sheet             (approve access when asked)
+       Ledger > Set up sheet             (approve access when asked; run it again after updating this file)
        Ledger > New board password       (shown once: copy it to the board)
-       Ledger > Set sign-up code         (share it at meetings)
+       Ledger > Set meeting code         (or change it from the board tool at the meeting)
   4. Apps Script: Deploy > New deployment > Web app. Execute as: Me. Who has access: Anyone.
      Copy the URL ending in /exec into ledger.apiUrl in content/club.js in the website repo, then commit.
   5. Share the Sheet only with board members who need it, never "Anyone with the link".
 
-  Every week: open www.uchipokerclub.com/ledger/record (unlinked, board password required).
+  Every meeting: show the meeting code in the room. Members log their chips at www.uchipokerclub.com/ledger/log,
+  and a board member checks each stack and approves it at www.uchipokerclub.com/ledger/record (board password).
 
   Security model
-  - Public read: names and results of people who have played. Emails never leave the Sheet.
-  - Joining needs the sign-up code (6+ characters). Anonymous traffic is capped per minute, so guessing it is impractical.
-  - Recording results needs the board password: a generated 96-bit secret, stored only as a SHA-256 hash.
-    Requests with the right password are never rate limited, so a flood cannot lock the board out.
-  - Changing the password or code needs edit access to this Sheet (your Google login).
+  - Public read: names and results of people who have played. Emails and unapproved results never leave the Sheet.
+  - Joining and logging a result need the meeting code (6+ characters). Anonymous traffic is capped per minute, so
+    guessing it is impractical. The list of names is shown only to someone with the code.
+  - A logged result counts only after a board member approves it. Logging is open on meeting nights only (4 p.m. to
+    4 a.m. Chicago, on the date a week column names), with one entry per member per night.
+  - Recording, approving and changing the code need the board password: a generated 96-bit secret, stored only as a
+    SHA-256 hash. Requests with the right password are never rate limited, so a flood cannot lock the board out.
+  - Changing the password needs edit access to this Sheet (your Google login).
   - Sponsor inquiries from the Contact page are saved to the Sponsor inquiries tab, capped per hour.
     Nothing is emailed: the script has no permission to send mail.
   - Mailing-list sign-ups from the site footer go to the Mailing list tab: any email, de-duplicated,
@@ -35,6 +39,8 @@ var SHEET_NAME = "Players";
 var LOG_NAME = "Log";
 var LIST_NAME = "Mailing list";
 var SPONSOR_NAME = "Sponsor inquiries";
+var SUBMIT_NAME = "Submissions";
+var TIME_ZONE = "America/Chicago"; // meeting days are Chicago dates
 // Shown to visitors when a form cannot take their details. This script never sends email.
 var CLUB_EMAIL = "UofChicagoPokerClub@gmail.com";
 var FIXED = ["Name", "Email", "Year", "Joined", "Source"]; // columns A to E; weeks start at F
@@ -46,6 +52,10 @@ var MAX_PLAYERS = 3000;      // sign-ups stop past this many rows
 var MAX_SUBSCRIBERS = 20000; // mailing-list rows
 var MAX_SPONSOR_ROWS = 5000;  // sponsor inquiry rows
 var SPONSORS_PER_HOUR = 20;  // keeps a flood from burying the club inbox
+var MAX_SUBMISSIONS = 20000; // logged-result rows (one per member per night, so a term needs a few hundred)
+var MAX_LOGS_PER_NIGHT = 5;  // a member can fix a typo, not flood the board's list
+var NIGHT_OPENS = 16;        // logging opens at 4 p.m. Chicago on a meeting day...
+var NIGHT_CLOSES = 4;        // ...and closes at 4 a.m., for a meeting that runs late
 var STARTING_STACK = 10000;  // chips each member starts a meeting with (Fall 2026 schedule email)
 var MAX_BODY = 100000;       // bytes per request
 var MAX_CHIPS = 10000000;    // largest result accepted for one night
@@ -58,7 +68,7 @@ function onOpen() {
     .createMenu("Ledger")
     .addItem("Set up sheet", "setupSheet")
     .addItem("New board password", "newBoardPasswordPrompt")
-    .addItem("Set sign-up code", "signupCodePrompt")
+    .addItem("Set meeting code", "meetingCodePrompt")
     .addSeparator()
     .addItem("Add a week", "addWeekPrompt")
     .addToUi();
@@ -79,12 +89,14 @@ function setupSheet() {
   logSheet_();
   listSheet_();
   sponsorSheet_();
+  var submissions = submitSheet_();
+  submissions.getRange(1, 3, submissions.getMaxRows(), 2).setNumberFormat("@"); // rows added since creation too
   ss.toast("Ledger sheet is ready.", "Ledger");
 }
 
 function newBoardPasswordPrompt() {
   var ui = SpreadsheetApp.getUi();
-  if (props_().getProperty("ADMIN_HASH")) {
+  if (prop_("ADMIN_HASH")) {
     var ok = ui.alert("Replace the board password?",
       "Every device using the old password is signed out and needs the new one.", ui.ButtonSet.YES_NO);
     if (ok !== ui.Button.YES) return;
@@ -100,15 +112,15 @@ function newBoardPasswordPrompt() {
   ui.showModalDialog(html, "Board password");
 }
 
-function signupCodePrompt() {
+function meetingCodePrompt() {
   var ui = SpreadsheetApp.getUi();
-  var current = props_().getProperty("JOIN_CODE");
-  var res = ui.prompt("Sign-up code",
-    (current ? "Current code: " + current + "\n\n" : "Sign-ups are closed until a code is set.\n\n") +
-    "New code, 6 to 20 letters or numbers. Leave blank to close sign-ups.", ui.ButtonSet.OK_CANCEL);
+  var current = prop_("JOIN_CODE");
+  var res = ui.prompt("Meeting code",
+    (current ? "Current code: " + current + "\n\n" : "Joining and logging results are closed until a code is set.\n\n") +
+    "New code, 6 to 20 letters or numbers. Leave blank to close joining and logging.", ui.ButtonSet.OK_CANCEL);
   if (res.getSelectedButton() !== ui.Button.OK) return;
-  var out = setSignupCode_(res.getResponseText());
-  ui.alert(out.ok ? (out.code ? "Sign-up code is now " + out.code + "." : "Sign-ups are closed.") : out.error);
+  var out = setMeetingCode_(res.getResponseText(), "sheet menu");
+  ui.alert(out.ok ? (out.code ? "The meeting code is now " + out.code + "." : "Joining and logging are closed.") : out.error);
 }
 
 function addWeekPrompt() {
@@ -140,7 +152,7 @@ function doGet() {
   return json_(body);
 }
 
-// POST /exec: join form and board tool. Body is a JSON string sent as text/plain (no preflight).
+// POST /exec: the site's forms and the board tool. Body is a JSON string sent as text/plain (no preflight).
 function doPost(e) {
   var raw = (e && e.postData && e.postData.contents) || "";
   if (raw.length > MAX_BODY) return json_({ ok: false, error: "Request too large." });
@@ -152,9 +164,13 @@ function doPost(e) {
 
   try {
     var action = data.action || "join";
-    // Only unauthenticated traffic is throttled: a flood can slow sign-ups but never blocks the board.
-    if (action === "join") return json_(allow_("anon", ANON_PER_MINUTE, 60) ? join_(data) : busy);
-    if (action === "subscribe") return json_(allow_("anon", ANON_PER_MINUTE, 60) ? subscribe_(data) : busy);
+    // Only unauthenticated traffic is throttled: a flood can slow sign-ups but never blocks the board. Every
+    // action that checks the meeting code goes through here, which is what makes guessing the code impractical.
+    var throttled = function (fn) { return json_(allow_("anon", ANON_PER_MINUTE, 60) ? fn(data) : busy); };
+    if (action === "join") return throttled(join_);
+    if (action === "roster") return throttled(roster_);
+    if (action === "submit") return throttled(submit_);
+    if (action === "subscribe") return throttled(subscribe_);
     if (action === "sponsor") {
       var open = allow_("anon", ANON_PER_MINUTE, 60) && allow_("sponsor", SPONSORS_PER_HOUR, 3600);
       return json_(open ? sponsor_(data) : { ok: false, error: "Too many inquiries right now. Email " + CLUB_EMAIL + " instead." });
@@ -167,6 +183,8 @@ function doPost(e) {
     if (action === "load") return json_({ ok: true, data: getAdminData_() });
     if (action === "save") return json_(saveWeek_(data.week, data.entries, data.startingStack, by));
     if (action === "addPlayer") return json_(addPlayer_(data.name, by));
+    if (action === "review") return json_(review_(data.id, data.decision, data.chips, by));
+    if (action === "setCode") return json_(setMeetingCode_(data.code, by));
     return json_({ ok: false, error: "Unknown action." });
   } catch (err) {
     return json_({ ok: false, error: err && err.message ? err.message : "Something went wrong. Try again." });
@@ -175,15 +193,21 @@ function doPost(e) {
 
 /* ---------- Join ---------- */
 
+// The meeting code gates joining and logging. It is checked before anything else, so a caller without it
+// learns nothing about the form or the list of names. Returns null when the code is right.
+function checkCode_(raw, closedMessage) {
+  var code = prop_("JOIN_CODE");
+  if (!code) return { ok: false, error: closedMessage };
+  if (!safeEqual_(normCode_(raw), code)) {
+    return { ok: false, field: "code", error: "That meeting code is not right. The board shows it at meetings." };
+  }
+  return null;
+}
+
 function join_(data) {
   if (data.website) return { ok: true, name: "" }; // honeypot: bots fill hidden fields
-
-  // The code is checked before anything else, so a caller without it learns nothing about the form.
-  var code = props_().getProperty("JOIN_CODE");
-  if (!code) return { ok: false, error: "Sign-ups are closed right now. Ask a board member." };
-  if (!safeEqual_(normCode_(data.code), code)) {
-    return { ok: false, field: "code", error: "That sign-up code is not right. The board shares it at meetings." };
-  }
+  var denied = checkCode_(data.code, "Sign-ups are closed right now. Ask a board member.");
+  if (denied) return denied;
 
   var n = validName_(data.name);
   if (n.error) return { ok: false, field: "name", error: n.error };
@@ -215,9 +239,165 @@ function join_(data) {
       return { ok: true, name: t.players[i].name };
     }
     t.sheet.appendRow([safe_(n.value), safe_(email), safe_(year), new Date(), "form"]);
+    clearNight_(); // someone joining at the meeting can log a minute later
     log_("join", n.value, "sign-up form");
     return { ok: true, name: n.value };
   });
+}
+
+/* ---------- Members log their results (meeting code, meeting nights only) ---------- */
+
+var LOG_CLOSED = "Logging is closed right now. Ask a board member.";
+var NOT_TONIGHT = "Results can only be logged on a meeting night.";
+var CHIPS_HINT = "Enter the number of chips in front of you.";
+
+// Step one of the log form: the meeting code unlocks tonight's week and the list of names.
+function roster_(data) {
+  var denied = checkCode_(data.code, LOG_CLOSED);
+  if (denied) return denied;
+  var night = night_();
+  if (!night.week) return { ok: false, error: NOT_TONIGHT };
+  return { ok: true, week: night.week, startingStack: loggingStack_(), names: night.names };
+}
+
+// Step two: a member logs their end-of-night chip count. Each member has one row per night in the Submissions tab;
+// logging again before it is approved updates that row and keeps the number it replaced, so the board can see a
+// change. Nothing counts until a board member has seen the chips and approved it.
+function submit_(data) {
+  var denied = checkCode_(data.code, LOG_CLOSED);
+  if (denied) return denied;
+  var chips = wholeChips_(data.chips);
+  if (chips === null) return { ok: false, field: "chips", error: CHIPS_HINT };
+  var night = night_();
+  if (!night.week) return { ok: false, error: NOT_TONIGHT };
+  var n = indexOfKey_(night.names, data.name);
+  if (n < 0) return { ok: false, field: "name", error: "Pick your name from the list." };
+  var name = night.names[n], week = night.week, start = loggingStack_();
+
+  return withLock_(function () {
+    // Read fresh under the lock: a board member may have just approved this night or typed it in.
+    var t = readTable_();
+    var w = indexOfKey_(t.weeks, week), i = indexOfKey_(t.players.map(function (p) { return p.name; }), name);
+    if (w < 0 || i < 0) return { ok: false, error: LOG_CLOSED };
+    if (t.players[i].results[w] !== null) {
+      return { ok: false, error: "Your " + week + " result is already on the ledger. Ask a board member to change it." };
+    }
+    var s = readSubmissions_(true), mine = null;
+    s.rows.forEach(function (r) {
+      if (r.status === "pending" && key_(r.week) === key_(week) && key_(r.name) === key_(name)) mine = r;
+    });
+    if (mine && mine.times >= MAX_LOGS_PER_NIGHT) {
+      return { ok: false, error: "You have logged " + week + " " + mine.times + " times. Show your chips to a board member." };
+    }
+    if (mine) {
+      s.sheet.getRange(mine.row + 2, 2, 1, 9).setValues([[new Date(), safe_(week), safe_(name), chips, start,
+        chips - start, "pending", mine.times + 1, mine.chips]]);
+    } else {
+      if (s.rows.length >= MAX_SUBMISSIONS) return { ok: false, error: "The results log is full. Ask a board member." };
+      s.sheet.appendRow([Utilities.getUuid(), new Date(), safe_(week), safe_(name), chips, start, chips - start,
+        "pending", 1, "", "", "", ""]);
+    }
+    return { ok: true, name: name, week: week, result: chips - start, replaced: Boolean(mine) };
+  });
+}
+
+// Members always log chip counts, so they need a stack even after the board has saved a week in profit-or-loss
+// mode, which stores 0.
+function loggingStack_() { return startingStack_() || STARTING_STACK; }
+
+// A whole number of chips from 0 to MAX_CHIPS, or null.
+function wholeChips_(v) {
+  var n = num_(v);
+  return n === null || n < 0 || n > MAX_CHIPS || Math.floor(n) !== n ? null : n;
+}
+
+// Tonight's week and the names on the ledger, cached for a minute because every phone in the room asks at once.
+// join_, addPlayer_ and addWeek_ clear it.
+function night_() {
+  var cache = CacheService.getScriptCache(), k = "night:" + nightDate_();
+  var hit = cache.get(k);
+  if (hit) return JSON.parse(hit);
+  var t = readTable_(), w = tonight_(t.weeks);
+  var night = {
+    week: w >= 0 ? t.weeks[w] : "",
+    names: t.players.map(function (p) { return p.name; })
+      .sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); })
+  };
+  cache.put(k, JSON.stringify(night), 60);
+  return night;
+}
+function clearNight_() { CacheService.getScriptCache().remove("night:" + nightDate_()); }
+
+// Columns: 1 ID, 2 Logged, 3 Week, 4 Name, 5 Chips, 6 Stack, 7 Result, 8 Status, 9 Times, 10 Earlier chips,
+// 11 Counted, 12 Reviewed by, 13 Reviewed at.
+var SUBMIT_HEADER = ["ID", "Logged", "Week", "Name", "Chips", "Stack", "Result", "Status", "Times", "Earlier chips",
+  "Counted", "Reviewed by", "Reviewed at"];
+
+function submitSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SUBMIT_NAME);
+  if (sheet) return sheet;
+  try {
+    sheet = ss.insertSheet(SUBMIT_NAME);
+  } catch (err) {
+    // Another request created it a moment ago.
+    sheet = ss.getSheetByName(SUBMIT_NAME);
+    if (!sheet) throw err;
+    return sheet;
+  }
+  sheet.getRange(1, 1, 1, SUBMIT_HEADER.length).setValues([SUBMIT_HEADER]).setFontWeight("bold");
+  sheet.getRange(1, 3, sheet.getMaxRows(), 2).setNumberFormat("@"); // week and name stay literal text
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+// create: false for read-only callers, which see no rows until the tab exists.
+function readSubmissions_(create) {
+  var sheet = create ? submitSheet_() : SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SUBMIT_NAME);
+  if (!sheet) return { sheet: null, rows: [] };
+  var n = sheet.getLastRow() - 1;
+  var values = n > 0 ? sheet.getRange(2, 1, n, SUBMIT_HEADER.length).getValues() : [];
+  return {
+    sheet: sheet,
+    rows: values.map(function (r, i) {
+      return { row: i, id: String(r[0]), at: r[1], week: weekText_(r[2]), name: clean_(r[3]), chips: num_(r[4]),
+        stack: num_(r[5]), result: num_(r[6]), status: clean_(r[7]), times: num_(r[8]) || 1, earlier: num_(r[9]) };
+    })
+  };
+}
+
+// Sheets can turn "Oct 16" typed into a cell without text format into a date; read it back as the label.
+function weekText_(v) { return isDate_(v) ? Utilities.formatDate(v, TIME_ZONE, "MMM d") : clean_(v); }
+function isDate_(v) { return Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime()); }
+
+// The Chicago date of the meeting night under way at `now` (default: this moment), or "" outside meeting-night
+// hours (NIGHT_OPENS until NIGHT_CLOSES the next morning). The tests replace this to pretend a meeting is on.
+function nightDate_(now) {
+  now = now || new Date();
+  var hour = Number(Utilities.formatDate(now, TIME_ZONE, "H"));
+  if (hour < NIGHT_OPENS && hour >= NIGHT_CLOSES) return "";
+  return Utilities.formatDate(new Date(now.getTime() - NIGHT_CLOSES * 3600000), TIME_ZONE, "yyyy-MM-dd");
+}
+
+var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+// A week column label ("Oct 9") plus the year in TERM -> "2026-10-09", or "" for a label that is not a date.
+// Ledger > Add a week refuses labels this cannot read, so every week can open for logging.
+function weekDate_(label) {
+  var m = /^([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{1,2})$/.exec(clean_(label));
+  var y = /(\d{4})\s*$/.exec(TERM);
+  if (!m || !y) return "";
+  var month = MONTHS.indexOf(m[1].toLowerCase()) + 1, day = Number(m[2]);
+  if (!month || day < 1 || day > 31) return "";
+  return y[1] + "-" + (month < 10 ? "0" : "") + month + "-" + (day < 10 ? "0" : "") + day;
+}
+
+// Index of the week being played tonight, or -1 outside a meeting night.
+function tonight_(weeks) {
+  var night = nightDate_();
+  if (!night) return -1;
+  for (var w = 0; w < weeks.length; w++) if (weekDate_(weeks[w]) === night) return w;
+  return -1;
 }
 
 /* ---------- Mailing list ---------- */
@@ -313,18 +493,47 @@ function sponsorSheet_() {
 
 function getAdminData_() {
   var t = readTable_();
+  var tonight = tonight_(t.weeks);
+  var subs = boardSubmissions_(t.weeks);
+  var waiting = -1;
+  subs.pending.forEach(function (s) { waiting = Math.max(waiting, indexOfKey_(t.weeks, s.week)); });
   var firstEmpty = -1;
   for (var w = 0; w < t.weeks.length && firstEmpty < 0; w++) {
     if (!t.players.some(function (p) { return p.results[w] !== null; })) firstEmpty = w;
   }
+  // Tonight during a meeting; then the latest week with entries still waiting; then the first week with no results.
+  var open = tonight >= 0 ? tonight : waiting >= 0 ? waiting : firstEmpty >= 0 ? firstEmpty : t.weeks.length - 1;
   return {
     term: TERM,
     weeks: t.weeks,
-    defaultWeek: t.weeks[firstEmpty >= 0 ? firstEmpty : t.weeks.length - 1] || "",
+    defaultWeek: t.weeks[open] || "",
+    tonight: tonight >= 0 ? t.weeks[tonight] : "",
     // A saved 0 means "type profit or loss directly", so only a missing value falls back to the default.
     startingStack: startingStack_(),
-    players: t.players.map(function (p) { return { name: p.name, results: p.results }; }) // never emails
+    meetingCode: prop_("JOIN_CODE") || "",
+    players: t.players.map(function (p) { return { name: p.name, results: p.results }; }), // never emails
+    submissions: subs.pending,
+    handled: subs.handled
   };
+}
+
+// What the board tool needs from the Submissions tab: every entry still waiting this term (newest first), and how
+// many were already approved or rejected per week. A problem with the tab never keeps the board out of the tool.
+function boardSubmissions_(weeks) {
+  var out = { pending: [], handled: {} };
+  try {
+    readSubmissions_(false).rows.forEach(function (r) {
+      var w = indexOfKey_(weeks, r.week);
+      if (w < 0) return;
+      if (r.status !== "pending") { out.handled[weeks[w]] = (out.handled[weeks[w]] || 0) + 1; return; }
+      out.pending.push({ id: r.id, week: weeks[w], name: r.name, chips: r.chips, stack: r.stack, result: r.result,
+        times: r.times, earlier: r.earlier, at: isDate_(r.at) ? r.at.toISOString() : String(r.at) });
+    });
+  } catch (err) {
+    return out;
+  }
+  out.pending.reverse();
+  return out;
 }
 
 // entries: [{ name, value }] where value is what was typed (a number) or null to clear the cell.
@@ -359,15 +568,55 @@ function saveWeek_(week, entries, startingStack, by) {
     });
 
     range.setValues(column);
-    props_().setProperty("startingStack", String(start));
+    setProp_("startingStack", String(start));
     clearCache_();
     log_("results", t.weeks[w] + ": " + saved + " saved, " + cleared + " cleared", by);
     return { ok: true, saved: saved, cleared: cleared, missing: missing, week: t.weeks[w] };
   });
 }
 
+// A board member has seen the chips. Approve writes counted chips minus the stack the entry was logged against into
+// the Players tab; reject writes nothing, and the member can log again. Either way the member's own number stays on
+// the row, so what was claimed and what was counted can both be checked later.
+function review_(id, decision, counted, by) {
+  if (decision !== "approve" && decision !== "reject") throw new Error("Choose approve or reject.");
+  var chips = decision === "approve" ? wholeChips_(counted) : null;
+  if (decision === "approve" && chips === null) {
+    throw new Error("Enter the chips you counted, a whole number up to " + MAX_CHIPS + ".");
+  }
+  var done = withLock_(function () {
+    var s = readSubmissions_(false), r = null;
+    for (var i = 0; i < s.rows.length && !r; i++) if (s.rows[i].id === String(id)) r = s.rows[i];
+    if (!r) return { ok: false, error: "That entry is no longer there. Refresh the list." };
+    if (r.status !== "pending") return { ok: false, error: r.name + "’s entry was already " + (r.status || "handled") + "." };
+    var keep = [r.times, r.earlier === null ? "" : r.earlier];
+
+    if (decision === "reject") {
+      s.sheet.getRange(r.row + 2, 8, 1, 6).setValues([["rejected"].concat(keep, ["", safe_(by), new Date()])]);
+      return { ok: true, decision: "reject", name: r.name, week: r.week, log: r.week + ": " + r.name };
+    }
+
+    var t = readTable_();
+    var w = indexOfKey_(t.weeks, r.week), p = indexOfKey_(t.players.map(function (x) { return x.name; }), r.name);
+    if (w < 0 || p < 0) return { ok: false, error: r.name + " is no longer on the ledger for " + r.week + "." };
+    if (t.players[p].results[w] !== null) {
+      return { ok: false, error: r.name + " already has a result for " + r.week + ". Reject this entry, or change the number in the table." };
+    }
+    var result = chips - (r.stack || STARTING_STACK);
+    t.sheet.getRange(t.players[p].row + 2, FIXED.length + w + 1).setValue(result);
+    s.sheet.getRange(r.row + 2, 7, 1, 7).setValues([[result, "approved"].concat(keep, [chips, safe_(by), new Date()])]);
+    clearCache_();
+    return { ok: true, decision: "approve", name: r.name, week: r.week, result: result,
+      log: r.week + ": " + r.name + ", counted " + chips + " (logged " + r.chips + ")" };
+  });
+  // Logged after the lock is released, so the audit trail never makes the next member wait.
+  if (done.ok) log_(done.decision === "approve" ? "approved result" : "rejected result", done.log, by);
+  delete done.log;
+  return done;
+}
+
 function startingStack_() {
-  var saved = props_().getProperty("startingStack");
+  var saved = prop_("startingStack");
   return saved === null ? STARTING_STACK : Number(saved) || 0;
 }
 
@@ -381,6 +630,7 @@ function addPlayer_(name, by) {
       return { ok: false, error: n.value + " is already on the ledger." };
     }
     t.sheet.appendRow([safe_(n.value), "", "", new Date(), "board"]);
+    clearNight_();
     log_("add player", n.value, by);
     return { ok: true, name: n.value };
   });
@@ -389,11 +639,14 @@ function addPlayer_(name, by) {
 function addWeek_(label) {
   label = clean_(label);
   if (!label || label.length > 20) return { ok: false, error: "Enter a label for the week, up to 20 characters." };
+  // Members can log only on the night a week's label names, so it has to be a date this file can read.
+  if (!weekDate_(label)) return { ok: false, error: "Use the meeting date as the label, like Jan 8, so members can log that night." };
   return withLock_(function () {
     var t = readTable_();
     if (indexOfKey_(t.weeks, label) >= 0) return { ok: false, error: "There is already a week called " + label + "." };
     t.sheet.getRange(1, FIXED.length + t.weeks.length + 1).setNumberFormat("@").setValue(safe_(label)).setFontWeight("bold");
     clearCache_();
+    clearNight_();
     log_("add week", label, "sheet menu");
     return { ok: true, week: label };
   });
@@ -409,23 +662,25 @@ function createBoardPassword_() {
     hex += u.slice(0, 12) + u.slice(13, 16) + u.slice(17); // drop the fixed version and variant digits
   }
   var key = hex.slice(0, 24).match(/.{4}/g).join("-");
-  props_().setProperty("ADMIN_HASH", sha256_(normKey_(key)));
+  setProp_("ADMIN_HASH", sha256_(normKey_(key)));
   log_("board password", "new password created", "sheet menu");
   return key;
 }
 
-function setSignupCode_(raw) {
+// One code for joining and for logging results. Stored as JOIN_CODE, its name from before logging existed, so a
+// code set earlier keeps working. Blank closes both.
+function setMeetingCode_(raw, by) {
   var code = normCode_(raw);
-  if (!code) { props_().deleteProperty("JOIN_CODE"); log_("sign-up code", "sign-ups closed", "sheet menu"); return { ok: true, code: "" }; }
+  if (!code) { setProp_("JOIN_CODE", null); log_("meeting code", "joining and logging closed", by); return { ok: true, code: "" }; }
   if (code.length < 6 || code.length > 20) return { ok: false, error: "Use 6 to 20 letters or numbers." };
-  props_().setProperty("JOIN_CODE", code);
-  log_("sign-up code", "code changed", "sheet menu");
+  setProp_("JOIN_CODE", code);
+  log_("meeting code", "code changed", by);
   return { ok: true, code: code };
 }
 
 // Returns null when the password is right, or the message to show.
 function checkBoardPassword_(key) {
-  var stored = props_().getProperty("ADMIN_HASH");
+  var stored = prop_("ADMIN_HASH");
   if (!stored) return "No board password yet. In the Sheet: Ledger > New board password.";
   var k = normKey_(key);
   if (k.length !== 24 || !safeEqual_(sha256_(k), stored)) return "That board password is not right.";
@@ -530,6 +785,23 @@ function allow_(name, limit, windowSec) {
 }
 
 function props_() { return PropertiesService.getScriptProperties(); }
+
+// Settings read on every request (the meeting code, the board password hash, the starting stack) go through the
+// script cache: the daily Properties quota is small, and a flood of requests must not be able to spend it.
+var NO_VALUE = "\u0000none";
+function prop_(k) {
+  var cache = CacheService.getScriptCache(), hit = cache.get("prop:" + k);
+  if (hit !== null) return hit === NO_VALUE ? null : hit;
+  var v = props_().getProperty(k);
+  cache.put("prop:" + k, v === null ? NO_VALUE : v, 600);
+  return v;
+}
+// value null deletes the setting.
+function setProp_(k, value) {
+  if (value === null) props_().deleteProperty(k); else props_().setProperty(k, value);
+  CacheService.getScriptCache().put("prop:" + k, value === null ? NO_VALUE : value, 600);
+}
+
 function clean_(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim(); }
 function key_(s) { return clean_(s).toLowerCase(); }
 function indexOfKey_(list, s) {
@@ -541,10 +813,11 @@ function indexOfKey_(list, s) {
 function safe_(s) { return /^[=+\-@]/.test(s) ? "'" + s : s; }
 function clearCache_() { CacheService.getScriptCache().remove(CACHE_KEY); }
 
+// flush() before release: Sheets batches writes, and the next request to take the lock must read them.
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(15000);
-  try { return fn(); } finally { lock.releaseLock(); }
+  lock.waitLock(30000);
+  try { return fn(); } finally { SpreadsheetApp.flush(); lock.releaseLock(); }
 }
 
 function json_(obj) {

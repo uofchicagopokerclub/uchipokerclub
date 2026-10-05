@@ -23,11 +23,16 @@ The Google Sheet is the database. Its Apps Script (`apps-script/Code.gs`) is a s
 
 | Request | Who | What |
 |---|---|---|
-| `GET` | Anyone | Names and weekly results of people who have played. Never emails. |
-| `POST join` | Anyone with the sign-up code | Adds a member to the Players tab |
+| `GET` | Anyone | Names and weekly results of people who have played. Never emails, never unapproved results. |
+| `POST join` | Anyone with the meeting code | Adds a member to the Players tab |
+| `POST roster` | Anyone with the meeting code, on a meeting day | Tonight's week and the list of names, for `/ledger/log` |
+| `POST submit` | Anyone with the meeting code, on a meeting day | Adds a pending row to the Submissions tab. Counts only once approved |
 | `POST subscribe` | Anyone | Adds a row to the Mailing list tab (footer form) |
 | `POST sponsor` | Anyone, capped per hour | Adds a row to the Sponsor inquiries tab (Contact page). Nothing is emailed |
-| `POST load`, `save`, `addPlayer` | Board password only | The results tool at `/ledger/record` |
+| `POST load`, `save`, `addPlayer`, `review`, `setCode` | Board password only | The board tool at `/ledger/record`: results, approvals, the meeting code |
+
+A meeting day is the date in a week column's label ("Oct 9") in the term's year, Chicago time. Approving writes
+the result into the Players tab exactly as Save does, so standings and attendance only ever come from there.
 
 The home page and `/ledger` are rebuilt in the background at most every 60 seconds, so standings update without
 a redeploy and visitors never wait on Google. If the Sheet is unreachable, the page falls back to fetching in

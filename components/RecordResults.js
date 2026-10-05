@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { postToLedger } from '../lib/api';
 import { endSentence, nameKey, parseChips, signed, tone } from '../lib/ledger';
+import Approvals from './Approvals';
 
 // Board tool. The board password is checked by the Apps Script on every request; this page only
 // hides the form. Without "Remember", the password lives in memory and is gone on refresh.
@@ -46,9 +47,13 @@ export default function RecordResults() {
   const [query, setQuery] = useState('');
   const [msg, setMsg] = useState({ text: '', kind: '' });
   const [busy, setBusy] = useState(false);
+  const [codeEdit, setCodeEdit] = useState(null); // the meeting code being typed, or null when not editing
   const tableRef = useRef(null);
   const findRef = useRef(null);
   const focusFirst = useRef(false);
+  // The week on screen when a slow request finishes, not when it started.
+  const weekRef = useRef(0);
+  weekRef.current = week;
 
   // keepKey: a network error rather than a wrong password, so the saved password stays and Unlock retries it.
   const lock = useCallback((message, keepKey = false) => {
@@ -83,10 +88,37 @@ export default function RecordResults() {
     const d = res.data;
     setData(d);
     setWeek(Math.max(0, keepWeek !== null ? keepWeek : d.weeks.indexOf(d.defaultWeek)));
-    setStartText((s) => (s || !d.startingStack ? s : String(d.startingStack)));
-    if (!keepEdits) setEdits(new Map());
+    // Kept edits keep the stack they were typed against, even a deliberately empty one (profit or loss).
+    if (!keepEdits) {
+      setStartText((s) => (s || !d.startingStack ? s : String(d.startingStack)));
+      setEdits(new Map());
+    }
     setPhase('ready');
   }, [board]);
+
+  // Refresh for the approvals list: whatever week is on screen, with unsaved table edits kept.
+  const reload = useCallback(() => load({ keepWeek: weekRef.current, keepEdits: true }), [load]);
+
+  // A decision from the approvals list, applied to the data in place.
+  const onDecided = useCallback(({ id, decision, name, week: label, result }) => {
+    setData((d) => {
+      const w = d.weeks.findIndex((x) => nameKey(x) === nameKey(label));
+      const players = decision === 'approve' && w >= 0
+        ? d.players.map((p) => (nameKey(p.name) === nameKey(name) ? { ...p, results: p.results.map((v, i) => (i === w ? result : v)) } : p))
+        : d.players;
+      const handled = { ...(d.handled || {}), [label]: ((d.handled || {})[label] || 0) + 1 };
+      return { ...d, players, handled, submissions: d.submissions.filter((s) => s.id !== id) };
+    });
+    // An unsaved table edit for the same player would overwrite the approved result on the next Save.
+    if (decision === 'approve') {
+      setEdits((m) => {
+        if (!m.has(nameKey(name))) return m;
+        const next = new Map(m);
+        next.delete(nameKey(name));
+        return next;
+      });
+    }
+  }, []);
 
   useEffect(() => {
     session.current = { key: recall(), by: readName() };
@@ -222,14 +254,34 @@ export default function RecordResults() {
     }
   }
 
-  function changeWeek(e) {
+  // The Sheet's Ledger menu does not exist in the Google Sheets phone app, so the code is changed from here.
+  async function saveCode(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await board('setCode', { code: codeEdit });
+      setData((d) => ({ ...d, meetingCode: r.code }));
+      setCodeEdit(null);
+      setMsg({ text: r.code ? `The meeting code is now ${r.code}.` : 'Joining and logging are closed until you set a code.', kind: 'ok' });
+    } catch (err) {
+      if (!err.auth) setMsg({ text: err.message, kind: 'err' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function showWeek(i) {
     if (changes.length) {
       setMsg({ text: `Save or discard your changes to ${data.weeks[week]} first.`, kind: 'err' });
       return;
     }
-    setWeek(Number(e.target.value));
+    setWeek(i);
     setEdits(new Map());
     setMsg({ text: '', kind: '' });
+  }
+
+  function changeWeek(e) {
+    showWeek(Number(e.target.value));
   }
 
   function onEntryKey(e) {
@@ -287,6 +339,29 @@ export default function RecordResults() {
         </button>
       </p>
 
+      {/* An older backend sends no code at all; showing "closed" then would be wrong, so the row waits for it. */}
+      {data.meetingCode !== undefined && <div className="code-row">
+        <span className="field-label">Meeting code</span>
+        {codeEdit === null ? (
+          <p className="code-show">
+            <b>{data.meetingCode || 'None, so joining and logging are closed'}</b>
+            <button className="link-btn" type="button" onClick={() => setCodeEdit(data.meetingCode || '')}>Change</button>
+          </p>
+        ) : (
+          <>
+            <form className="code-edit" onSubmit={saveCode} noValidate>
+              <input
+                className="input" aria-label="New meeting code" maxLength={20} autoComplete="off" autoCapitalize="characters"
+                autoCorrect="off" spellCheck="false" value={codeEdit} onChange={(e) => setCodeEdit(e.target.value)}
+              />
+              <button className="btn btn-primary" type="submit" disabled={busy}>Save code</button>
+              <button className="btn btn-secondary" type="button" onClick={() => setCodeEdit(null)}>Cancel</button>
+            </form>
+            <span className="field-help">Members need it to join and to log results. Set a new one at each meeting, and clear it when the meeting ends.</span>
+          </>
+        )}
+      </div>}
+
       <div className="controls" style={{ marginTop: 20 }}>
         <label className="field">
           <span className="field-label">Week</span>
@@ -328,6 +403,8 @@ export default function RecordResults() {
           <button className="btn btn-primary" type="button" onClick={addPlayer} disabled={busy}>Add &ldquo;{query.trim()}&rdquo;</button>
         )}
       </div>
+
+      <Approvals data={data} week={week} query={query} board={board} onDecided={onDecided} reload={reload} onShowWeek={showWeek} />
 
       {!data.players.length ? (
         <p className="ledger-state">No players yet. People join through the sign-up form, or type a name above and press Add.</p>

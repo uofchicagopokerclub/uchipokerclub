@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chicagoNow, formatDay, formatTimeRange, isOver, nextMeeting } from '../lib/schedule.js';
+import { chicagoNow, formatClock, formatDay, formatTimeRange, isOver, nextMeeting } from '../lib/schedule.js';
+
+test('formatClock shows Chicago time and ignores junk', () => {
+  assert.equal(formatClock('2026-10-09T23:42:00.000Z'), '6:42 PM');
+  assert.equal(formatClock('2026-12-04T23:42:00.000Z'), '5:42 PM');
+  assert.equal(formatClock('not a time'), '');
+});
 
 const meetings = [
   { date: '2026-10-09', start: '18:00', end: '20:00' },

@@ -18,9 +18,9 @@ ok("setup creates an empty ledger and a Log tab", () => {
 });
 
 console.log(" sign-ups");
-ok("closed until a sign-up code exists (fail closed)", () => assert.match(post({ name: "A", email: "a@uchicago.edu", year: "2028" }).error, /closed/));
-ok("sign-up code set and normalized", () => { const r = G.setSignupCode_(" poker-26 "); CODE = r.code; assert.strictEqual(CODE, "POKER26"); });
-ok("code shorter than 6 rejected", () => assert.strictEqual(G.setSignupCode_("ABCDE").ok, false));
+ok("closed until a meeting code exists (fail closed)", () => assert.match(post({ name: "A", email: "a@uchicago.edu", year: "2028" }).error, /closed/));
+ok("meeting code set and normalized", () => { const r = G.setMeetingCode_(" poker-26 ", "sheet menu"); CODE = r.code; assert.strictEqual(CODE, "POKER26"); });
+ok("code shorter than 6 rejected", () => assert.strictEqual(G.setMeetingCode_("ABCDE", "sheet menu").ok, false));
 ok("wrong code rejected before any field feedback", () => {
   const r = post({ code: "nope", name: "<script>", email: "x", year: "x" });
   assert.strictEqual(r.field, "code");
@@ -202,12 +202,171 @@ ok("sponsor inquiries are capped per hour", () => {
   assert.ok(capped > 0);
 });
 ok("sponsor details never appear in the public feed", () => assert.ok(!JSON.stringify(get()).includes("deshaw")));
+console.log(" members log results, the board approves");
+const realNight = G.nightDate_;
+const night = (d) => { G.nightDate_ = () => d; };
+// Settings are cached, so a test that writes one behind the script's back clears its cache entry too.
+const setStack = (v) => { if (v === null) G.__props.delete("startingStack"); else G.__props.set("startingStack", v); G.__cache.delete("prop:startingStack"); };
+const roster = (o) => post(Object.assign({ action: "roster", code: CODE }, o));
+const submit = (o) => post(Object.assign({ action: "submit", code: CODE }, o));
+const pendingFor = (name) => admin("load").data.submissions.find((s) => s.name === name);
+const subRow = (name, status) => G.__submissions().g.slice(1).find((x) => x && x[3] === name && (!status || x[7] === status));
+ok("a meeting night runs 4 p.m. to 4 a.m. Chicago", () => {
+  eq([realNight(new Date("2026-10-09T23:30:00Z")), realNight(new Date("2026-10-10T06:30:00Z")), realNight(new Date("2026-10-09T15:00:00Z"))],
+    ["2026-10-09", "2026-10-09", ""]);
+});
+ok("week labels map to dates in the term's year, for every month", () => {
+  eq([G.weekDate_("Oct 9"), G.weekDate_("Nov 20"), G.weekDate_("Sept 3"), G.weekDate_("Week 1"), G.weekDate_("Oct 40")],
+    ["2026-10-09", "2026-11-20", "2026-09-03", "", ""]);
+  const labels = ["Jan 1", "Feb 2", "Mar 3", "Apr 4", "May 5", "Jun 6", "Jul 7", "Aug 8", "Sep 9", "Oct 10", "Nov 11", "Dec 12"];
+  eq(labels.map((l) => G.weekDate_(l)), labels.map((l, i) => `2026-${String(i + 1).padStart(2, "0")}-${l.split(" ")[1].padStart(2, "0")}`));
+});
+ok("logging is closed outside a meeting night", () => {
+  night("");
+  assert.match(roster().error, /meeting night/);
+  assert.match(submit({ name: "Jamie K.", chips: 1000 }).error, /meeting night/);
+  night("2026-10-10"); // a night no week column names
+  assert.match(roster().error, /meeting night/);
+});
+ok("the name list needs the meeting code, is sorted, and has no emails", () => {
+  night("2026-10-16");
+  setStack("10000");
+  assert.match(roster({ code: "" }).error || "", /not right/);
+  eq(roster({ code: "WRONG1" }).field, "code");
+  const r = roster();
+  eq([r.ok, r.week, r.startingStack], [true, "Oct 16", 10000]);
+  assert.ok(r.names.includes("Jamie K.") && r.names.includes("Robin S."));
+  eq(r.names, r.names.slice().sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())));
+  assert.ok(!JSON.stringify(r).includes("@"));
+});
+ok("a logged result checks the code, the name and the chip count", () => {
+  eq(submit({ code: "WRONG1", name: "Jamie K.", chips: 100 }).field, "code");
+  eq(submit({ name: "Nobody Here", chips: 100 }).field, "name");
+  eq(submit({ name: "=HYPERLINK(1)", chips: 100 }).field, "name");
+  for (const chips of [-1, 2.5, 10000001, "abc", null, "=1+1"]) eq(submit({ name: "Jamie K.", chips }).field, "chips");
+});
+ok("a logged result waits as pending and stays off the public ledger", () => {
+  const r = submit({ name: "jamie k.", chips: "12,500" });
+  eq([r.ok, r.name, r.week, r.result, r.replaced], [true, "Jamie K.", "Oct 16", 2500, false]);
+  assert.strictEqual(get().players.find((p) => p.name === "Jamie K.").results[1], null);
+  eq(subRow("Jamie K.").slice(2, 10), ["Oct 16", "Jamie K.", 12500, 10000, 2500, "pending", 1, ""]);
+});
+ok("logging again updates the same row and keeps the earlier number", () => {
+  const rows = G.__submissions().getLastRow();
+  const r = submit({ name: "Jamie K.", chips: 13000 });
+  eq([r.ok, r.replaced], [true, true]);
+  eq(G.__submissions().getLastRow(), rows);
+  eq(subRow("Jamie K.").slice(4, 10), [13000, 10000, 3000, "pending", 2, 12500]);
+});
+ok("a member can log at most five times a night", () => {
+  for (const chips of [13001, 13002, 13003]) eq(submit({ name: "Jamie K.", chips }).ok, true);
+  assert.match(submit({ name: "Jamie K.", chips: 1 }).error, /5 times/);
+  eq(subRow("Jamie K.").slice(4, 10), [13003, 10000, 3003, "pending", 5, 13002]);
+});
+ok("the board tool opens on tonight and gets each waiting entry once, with no emails", () => {
+  const d = admin("load").data;
+  eq([d.tonight, d.defaultWeek, d.meetingCode], ["Oct 16", "Oct 16", CODE]);
+  eq(d.submissions.filter((s) => s.name === "Jamie K.").map((s) => [s.chips, s.stack, s.result, s.times, s.earlier]), [[13003, 10000, 3003, 5, 13002]]);
+  assert.ok(!JSON.stringify(d).includes("@"));
+});
+ok("approving needs the board password and a counted number of chips", () => {
+  const s = pendingFor("Jamie K.");
+  assert.ok(post({ action: "review", key: "nope", id: s.id, decision: "approve", chips: 12000 }).auth);
+  for (const chips of [undefined, "", -5, 2.5, 10000001]) assert.match(admin("review", { id: s.id, decision: "approve", chips }).error, /chips you counted/);
+  eq(pendingFor("Jamie K.").id, s.id);
+});
+ok("approving writes counted chips minus the entry's own stack and keeps the member's number", () => {
+  setStack("20000"); // the board tool's stack changed after Jamie logged against 10,000
+  const s = pendingFor("Jamie K.");
+  const r = admin("review", { id: s.id, decision: "approve", chips: 12000 });
+  eq([r.ok, r.name, r.week, r.result], [true, "Jamie K.", "Oct 16", 2000]);
+  assert.strictEqual(get().players.find((p) => p.name === "Jamie K.").results[1], 2000);
+  const row = subRow("Jamie K.");
+  eq([row[4], row[6], row[7], row[8], row[9], row[10], row[11]], [13003, 2000, "approved", 5, 13002, 12000, "Max L."]);
+  assert.ok(G.__log().g.slice(-1)[0].slice(1, 4).join(" | ").startsWith("approved result | Oct 16: Jamie K., counted 12000 (logged 13003) | Max L."));
+  setStack("10000");
+});
+ok("an approved result cannot be approved twice or logged over", () => {
+  const id = subRow("Jamie K.", "approved")[0];
+  assert.match(admin("review", { id, decision: "approve", chips: 12000 }).error, /already approved/);
+  assert.match(submit({ name: "Jamie K.", chips: 20000 }).error, /already on the ledger/);
+});
+ok("rejecting writes nothing and lets the member log again", () => {
+  eq(submit({ name: "Robin S.", chips: 8000 }).ok, true);
+  const r = admin("review", { id: pendingFor("Robin S.").id, decision: "reject" });
+  eq([r.ok, r.decision, r.name], [true, "reject", "Robin S."]);
+  assert.strictEqual(get().players.some((p) => p.name === "Robin S."), false);
+  eq(subRow("Robin S.", "rejected")[11], "Max L.");
+  eq(submit({ name: "Robin S.", chips: 9000 }).ok, true);
+  eq(pendingFor("Robin S.").chips, 9000);
+  eq(admin("load").data.handled, { "Oct 16": 2 });
+});
+ok("bad review requests are refused and change nothing", () => {
+  const s = pendingFor("Robin S.");
+  assert.match(admin("review", { id: s.id, decision: "delete" }).error, /approve or reject/);
+  assert.match(admin("review", { id: "nope", decision: "approve", chips: 1 }).error, /no longer there/);
+  eq(pendingFor("Robin S.").id, s.id);
+});
+ok("approving never overwrites a result the board typed in, and that result locks logging", () => {
+  admin("save", { week: "Oct 16", entries: [{ name: "Robin S.", value: 9500 }], startingStack: 10000 });
+  assert.match(admin("review", { id: pendingFor("Robin S.").id, decision: "approve", chips: 9000 }).error, /already has a result/);
+  assert.strictEqual(get().players.find((p) => p.name === "Robin S.").results[1], -500);
+  assert.match(submit({ name: "Robin S.", chips: 9500 }).error, /already on the ledger/);
+});
+ok("a profit-or-loss save does not close logging", () => {
+  admin("save", { week: "Oct 9", entries: [{ name: "Late", value: 300 }] }); // no stack, so 0 is stored
+  eq(G.getAdminData_().startingStack, 0);
+  const r = roster();
+  eq([r.ok, r.startingStack], [true, 10000]);
+  eq(submit({ name: "Late", chips: 10300 }).result, 300);
+  setStack("10000");
+});
+ok("someone who joins at the meeting can log right away", () => {
+  eq(join({ name: "New Face", email: "newface@uchicago.edu", year: "2030" }).ok, true);
+  assert.ok(roster().names.includes("New Face"));
+});
+ok("after the night, the board tool opens on the week with entries still waiting", () => {
+  night("");
+  eq([admin("load").data.tonight, admin("load").data.defaultWeek], ["", "Oct 16"]);
+  night("2026-10-16");
+});
+ok("a week cell Sheets turned into a date still reads as its label", () => {
+  const sh = G.__submissions(), r = sh.g.findIndex((x) => x && x[3] === "Late");
+  sh.g[r][2] = new Date("2026-10-16T17:00:00Z");
+  eq(pendingFor("Late").week, "Oct 16");
+  sh.g[r][2] = "Oct 16";
+});
+ok("the board can change and close the meeting code from the board tool", () => {
+  eq(admin("setCode", { code: "poker-27" }).code, "POKER27");
+  eq(roster().field, "code");
+  CODE = "POKER27";
+  eq(roster().ok, true);
+  eq(admin("setCode", { code: "abc" }).ok, false);
+  assert.ok(G.__log().g.slice(-1)[0].slice(1, 4).join(" | ").startsWith("meeting code | code changed | Max L."));
+  assert.ok(post({ action: "setCode", key: "nope", code: "HACKED1" }).auth);
+  eq(roster().ok, true);
+});
+ok("set up adds the Submissions tab with headers, and running it again is safe", () => {
+  G.setupSheet();
+  G.setupSheet();
+  eq(G.__submissions().g[0], ["ID", "Logged", "Week", "Name", "Chips", "Stack", "Result", "Status", "Times", "Earlier chips", "Counted", "Reviewed by", "Reviewed at"]);
+});
+ok("unapproved results never reach the public feed", () => {
+  eq(get().players.some((p) => p.name === "New Face"), false);
+  eq(get().players.find((p) => p.name === "Late").results.slice(0, 2), [300, null]);
+});
+ok("weeks added from the menu must be dates members can log on", () => {
+  assert.match(G.addWeek_("Week 8").error, /meeting date/);
+  eq(G.addWeek_("Dec 4").ok, true);
+  eq(get().weeks.slice(-1)[0], "Dec 4");
+});
+G.nightDate_ = realNight;
 ok("the board tool defaults to a 10,000 chip starting stack, and a saved 0 sticks", () => {
-  G.__props.delete("startingStack");
+  setStack(null);
   assert.strictEqual(G.getAdminData_().startingStack, 10000);
-  G.__props.set("startingStack", "0");
+  setStack("0");
   assert.strictEqual(G.getAdminData_().startingStack, 0);
-  G.__props.set("startingStack", "10000");
+  setStack("10000");
 });
 ok("anonymous flood is cut off but the board still gets through", () => {
   let busy = 0;

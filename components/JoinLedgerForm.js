@@ -1,8 +1,10 @@
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { ledger } from '../content/club';
 import { postToLedger } from '../lib/api';
 import { endSentence } from '../lib/ledger';
 import FormSuccess from './FormSuccess';
+import SubmitButton from './SubmitButton';
 
 const YEARS = ledger.years;
 const DOMAIN = '@uchicago.edu';
@@ -36,7 +38,7 @@ export default function JoinLedgerForm() {
       website: values.website,
     };
     // Quick checks here; the server repeats them and has the final say.
-    if (!v.code) return fail('code', 'Enter the sign-up code.');
+    if (!v.code) return fail('code', 'Enter the meeting code.');
     if (!v.name) return fail('name', 'Enter the name you want on the leaderboard.');
     if (!/^\S+@\S+\.\S+$/.test(v.email)) return fail('email', 'Enter a valid email address.');
     if (!v.email.endsWith(DOMAIN)) return fail('email', `Use your ${DOMAIN} email.`);
@@ -66,8 +68,11 @@ export default function JoinLedgerForm() {
     return (
       <FormSuccess>
         <h2>{endSentence(`You\u2019re on the ledger, ${joined}`)}</h2>
-        <p>Your results show on the leaderboard after your first weekly meeting.</p>
-        <button className="btn btn-secondary" type="button" onClick={again} style={{ marginTop: 16 }}>Sign up someone else</button>
+        <p>At the end of each meeting, log your chips. Your result counts once a board member approves it.</p>
+        <div className="actions" style={{ marginTop: 16 }}>
+          <Link className="btn btn-primary" href="/ledger/log">Log my result</Link>
+          <button className="btn btn-secondary" type="button" onClick={again}>Sign up someone else</button>
+        </div>
       </FormSuccess>
     );
   }
@@ -77,9 +82,9 @@ export default function JoinLedgerForm() {
   return (
     <form className="form" onSubmit={submit} noValidate>
       <label className="field">
-        <span className="field-label">Sign-up code</span>
+        <span className="field-label">Meeting code</span>
         <input ref={refs.code} className="input" name="code" maxLength={20} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck="false" value={values.code} onChange={set('code')} aria-invalid={invalid('code')} aria-describedby="code-help" />
-        <span className="field-help" id="code-help">The board shares it at meetings.</span>
+        <span className="field-help" id="code-help">Shown in the room at meetings.</span>
         {errors.code && <span className="field-error">{errors.code}</span>}
       </label>
       <label className="field">
@@ -108,7 +113,7 @@ export default function JoinLedgerForm() {
       </label>
       {formError && <p className="form-error" role="alert">{formError}</p>}
       <div>
-        <button className="btn btn-primary" type="submit" disabled={sending}>{sending ? 'Joining' : 'Join the ledger'}</button>
+        <SubmitButton busy={sending} busyLabel="Joining">Join the ledger</SubmitButton>
       </div>
     </form>
   );

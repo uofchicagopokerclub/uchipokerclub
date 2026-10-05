@@ -22,12 +22,17 @@ function makeEnv() {
     setFrozenRows() {} setFrozenColumns() {}
   }
   const sheets = {};
-  const ss = { getSheetByName: n => sheets[n] || null, insertSheet: n => (sheets[n] = new Sheet(n)), toast() {} };
+  // Like Apps Script, inserting a tab whose name is taken throws.
+  const ss = {
+    getSheetByName: n => sheets[n] || null,
+    insertSheet: n => { if (sheets[n]) throw new Error(`A sheet with the name "${n}" already exists.`); return (sheets[n] = new Sheet(n)); },
+    toast() {},
+  };
   const cache = new Map(), props = new Map();
   const ui = { createMenu() { return { addItem() { return this; }, addSeparator() { return this; }, addToUi() {} }; }, alert() {}, prompt() {}, ButtonSet: {}, Button: {} };
   const ctx = {
     console,
-    SpreadsheetApp: { getActiveSpreadsheet: () => ss, getUi: () => ui },
+    SpreadsheetApp: { getActiveSpreadsheet: () => ss, getUi: () => ui, flush() {} },
     CacheService: { getScriptCache: () => ({ get: k => cache.has(k) ? cache.get(k) : null, put: (k, v) => cache.set(k, v), remove: k => cache.delete(k) }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => props.has(k) ? props.get(k) : null, setProperty: (k, v) => props.set(k, v), deleteProperty: k => props.delete(k) }) },
@@ -35,6 +40,12 @@ function makeEnv() {
       getUuid: () => crypto.randomUUID(),
       DigestAlgorithm: { SHA_256: "sha256" }, Charset: { UTF_8: "utf8" },
       computeDigest: (alg, s) => Array.from(crypto.createHash(alg).update(s, "utf8").digest()).map(b => b > 127 ? b - 256 : b),
+      formatDate: (d, tz, fmt) => {
+        if (fmt === "yyyy-MM-dd") return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+        if (fmt === "H") return String(Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(d)));
+        if (fmt === "MMM d") return new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric" }).format(d);
+        throw new Error("mock formatDate does not support " + fmt);
+      },
     },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: s => ({ s, setMimeType() { return this; }, getContent() { return s; } }) },
     HtmlService: { createHtmlOutput: () => ({ setWidth() { return this; }, setHeight() { return this; } }) },
@@ -47,6 +58,7 @@ function makeEnv() {
   ctx.__log = () => sheets.Log;
   ctx.__list = () => sheets["Mailing list"];
   ctx.__sponsors = () => sheets["Sponsor inquiries"];
+  ctx.__submissions = () => sheets.Submissions;
   ctx.__sent = [];
   ctx.__mailFails = false;
   ctx.__props = props;

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { mailingList } from '../content/club';
 import { postToLedger } from '../lib/api';
 import FormSuccess from './FormSuccess';
+import SubmitButton from './SubmitButton';
 
 // Same fields and button as the old Squarespace footer form. Sign-ups land in the
 // "Mailing list" tab of the club Google Sheet.
@@ -82,7 +83,7 @@ export default function MailingListForm() {
       </label>
       {formError && <p className="form-error" role="alert">{formError}</p>}
       <div>
-        <button className="btn btn-primary" type="submit" disabled={sending}>{sending ? 'Signing up' : 'Sign Up'}</button>
+        <SubmitButton busy={sending} busyLabel="Signing up">Sign Up</SubmitButton>
         <p className="field-help" style={{ marginTop: 10 }}>Only the board sees your email.</p>
       </div>
     </form>

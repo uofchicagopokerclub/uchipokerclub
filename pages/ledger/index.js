@@ -24,6 +24,10 @@ export default function LedgerPage({ feed, connected }) {
             <p className="eyebrow">{term}</p>
             <h1 className="page-title">The ledger</h1>
             <p className="muted" style={{ marginTop: 12 }}>{headline}</p>
+            <div className="actions" style={{ marginTop: 20 }}>
+              <Link className="btn btn-primary" href="/ledger/log">Log my result</Link>
+              <Link className="btn btn-secondary" href="/ledger/join">Join the ledger</Link>
+            </div>
           </div>
           <PrizePanel />
           <LedgerTable standings={standings} status={status} />

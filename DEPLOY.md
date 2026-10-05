@@ -24,15 +24,19 @@ so commits never carry another account's email.
 1. Signed in as UofChicagoPokerClub@gmail.com, create a Google Sheet named "UChicago Poker Club Ledger".
 2. Extensions > Apps Script. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo. Save.
 3. Reload the Sheet. A **Ledger** menu appears:
-   - **Set up sheet** (approve access once). Creates the Players, Log and Mailing list tabs.
+   - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries and
+     Submissions tabs. Safe to run again: it only adds what is missing.
    - **New board password**. Shown once: copy it into the board group chat.
-   - **Set sign-up code**. 6 to 20 letters or numbers. Share it at meetings; change it whenever you like.
+   - **Set meeting code**. 6 to 20 letters or numbers. Members need it to join and to log results. It can also be
+     changed from the board tool, which is easier at a meeting (the Ledger menu does not exist in the Sheets phone app).
 4. Deploy > New deployment > type **Web app**. Execute as: **Me**. Who has access: **Anyone**. Deploy and copy
    the URL ending in `/exec`.
 5. Paste that URL into `ledger.apiUrl` in `content/club.js` and commit.
 6. Share the Sheet (Editor) only with board members who need it. Never "Anyone with the link".
 
 After editing `Code.gs` later: Deploy > Manage deployments > edit > Version: **New version**. The URL stays the same.
+Then run **Ledger > Set up sheet** once, in case the new version added a tab. Deploy the backend before pushing a
+site change that calls a new backend action: the old backend answers an unknown action as a wrong board password.
 
 ## 2. Website: GitHub, then Vercel
 
@@ -80,10 +84,31 @@ pushes to other branches get their own preview link.
 **Rollback** at any point: in the Squarespace DNS panel, delete the Vercel records and re-add the Squarespace
 Defaults preset.
 
+## Run a meeting
+
+1. Before it starts, open www.uchipokerclub.com/ledger/record on your phone (board password), set a new
+   **meeting code**, and show it in the room with the address uchipokerclub.com/ledger/log.
+2. New members join at /ledger/join with the same code. At the end, everyone logs their chips at /ledger/log.
+   Members always log chip counts against a 10,000 stack, whatever the board tool's Starting stack field says.
+3. Each player shows you their stack. In the board tool's **To approve** list, type their name in the find box,
+   check the chips, correct **Chips counted** if needed, and press **Approve**. **Reject** if it is wrong; they can
+   log again. A card that says "Changed from" was logged more than once: make sure the person in front of you is
+   the one on the card. The public ledger updates within a minute.
+4. Walk-ins without a phone: type their name in the find box, enter their chips in the table, press Save. A result
+   typed in the table locks logging for that player that night, and Approve will not overwrite it.
+5. When the meeting ends, clear the meeting code (Change, empty, Save code), so last week's code cannot be used
+   before the next meeting.
+
+Logging is open from 4 p.m. to 4 a.m. Chicago on the date in a week column's label ("Oct 9"). Ledger > Add a week
+only accepts labels like that. A meeting moved to another day needs its own week column, or the board table.
+Entries still waiting after the night stay in the board tool; it opens on that week until they are handled.
+
 ## Everyday
 
 - **Change the site:** edit `content/club.js` on github.com (pencil icon), commit to `main`. Live in about a minute.
-- **Record a week:** www.uchipokerclub.com/ledger/record (board password).
-- **New term:** update the schedule and events in `content/club.js`; in the Sheet, Ledger > Add a week for each
-  meeting; update `TERM` and `WEEKS` in `Code.gs` and deploy a new version.
+- **Record a week:** www.uchipokerclub.com/ledger/record (board password), or approve what members logged.
+- **New term:** update the schedule and events in `content/club.js`; update `TERM` and `WEEKS` in `Code.gs` and
+  deploy a new version first (the week dates take their year from `TERM`); then in the Sheet, Ledger > Add a week
+  for each meeting. `npm test` checks that `WEEKS` falls on the weekly meeting dates; Add a week refuses a label
+  that is not a date.
 - **Board change:** Ledger > New board password (signs everyone out), and update the board in `content/club.js`.

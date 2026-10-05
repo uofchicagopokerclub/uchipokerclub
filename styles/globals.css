@@ -82,6 +82,7 @@ main > :last-child { padding-bottom: 0; }
 .btn-light { background: #fff; color: var(--maroon); border-color: #fff; }
 .btn-light:hover { background: var(--tint); border-color: var(--tint); }
 .btn:disabled { opacity: 0.55; cursor: default; }
+.btn:disabled[data-hydrating] { opacity: 1; } /* off only until the page's JavaScript runs, so it looks ready */
 .text-link { color: var(--maroon); font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .text-link:hover { text-decoration-thickness: 3px; }
 @media (prefers-reduced-motion: no-preference) {
@@ -431,6 +432,33 @@ select.input {
   .rec-table td.in { width: 120px; }
   .rec-table td.net { width: 88px; font-size: 0.875rem; }
   .rec-foot .btn { flex: 1; }
+}
+
+/* meeting code and approvals (board tool) */
+.code-row { display: grid; gap: 6px; margin-top: 18px; padding: 14px 16px; background: var(--tint); }
+.code-show { display: flex; flex-wrap: wrap; align-items: center; }
+.code-show b { font-size: 1.375rem; letter-spacing: 0.06em; }
+.code-show .link-btn { min-height: var(--tap); padding: 0 6px; }
+.code-edit { display: flex; flex-wrap: wrap; gap: 8px; }
+.code-edit .input { flex: 1 1 180px; text-transform: uppercase; }
+.approvals { margin-top: 22px; padding-top: 16px; border-top: 2px solid var(--maroon); }
+.approvals-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.approvals-head h2 { font-size: 1.25rem; }
+.approvals-empty { margin-top: 10px; color: var(--muted); }
+.approvals > .msg-ok, .approvals > .msg-err { margin-top: 10px; }
+.approval-list { list-style: none; display: grid; gap: 10px; margin-top: 12px; }
+.approval { padding: 14px 16px; background: var(--tint); border-left: 4px solid var(--maroon); }
+.approval-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.approval-top b { font-size: 1.0625rem; }
+.approval-net { font-size: 1.125rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.approval-meta { margin-top: 2px; font-size: 0.875rem; color: var(--muted); }
+.approval-warn { margin-top: 6px; font-size: 0.875rem; font-weight: 600; } /* color from .tc-off */
+.approvals-elsewhere { margin-top: 8px; font-size: 0.9375rem; color: var(--muted); }
+.approvals-elsewhere .link-btn { min-height: var(--tap); padding: 0 4px; }
+.approval-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: end; margin-top: 12px; }
+@media (max-width: 479px) {
+  .approval-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .approval-actions .field { grid-column: 1 / -1; }
 }
 
 /* ---------- 404 ---------- */
