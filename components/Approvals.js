@@ -10,7 +10,8 @@ const chipsText = (n) => Number(n).toLocaleString('en-US');
 // counted chips minus the stack the member logged against; reject writes nothing and the member can log again.
 // The board tool's find box filters these cards, so a board member types a name and approves. Decisions update the
 // tool's data in place (onDecided) instead of reloading everything after every tap.
-export default function Approvals({ data, week, query, board, onDecided, reload, onShowWeek }) {
+// busy: a board request is in flight (a table save, say), so decisions wait for it.
+export default function Approvals({ data, week, query, board, busy, onDecided, reload, onShowWeek }) {
   const [counted, setCounted] = useState({}); // entry id -> chips typed by the board member
   const [working, setWorking] = useState(false);
   const [note, setNote] = useState({ text: '', kind: '' });
@@ -28,17 +29,17 @@ export default function Approvals({ data, week, query, board, onDecided, reload,
   const typedFor = (s) => counted[s.id] ?? String(s.chips);
 
   // One request at a time: every card waits while any decision or refresh is in flight.
-  async function run(fn) {
+  async function run(fn, { refresh = true } = {}) {
     setWorking(true);
     setNote({ text: '', kind: '' });
     try {
       await fn();
     } catch (err) {
       // An auth failure already locked the tool. Anything else (another board member got there first, the network)
-      // is shown, and the list is refreshed so no stale card stays tappable.
+      // is shown, and the list is refreshed before the cards come back, so no stale card stays tappable.
       if (!err.auth) {
         setNote({ text: err.message, kind: 'err' });
-        reload().catch(() => {});
+        if (refresh) await reload().catch(() => {});
       }
     } finally {
       setWorking(false);
@@ -67,7 +68,7 @@ export default function Approvals({ data, week, query, board, onDecided, reload,
     <section className="approvals" aria-labelledby="approvals-title">
       <div className="approvals-head">
         <h2 id="approvals-title">To approve{pending.length ? ` (${pending.length})` : ''}</h2>
-        <button className="btn btn-secondary" type="button" onClick={() => run(reload)} disabled={working}>Refresh</button>
+        <button className="btn btn-secondary" type="button" onClick={() => run(reload, { refresh: false })} disabled={working || busy}>Refresh</button>
       </div>
       {elsewhere.length > 0 && (
         <p className="approvals-elsewhere">
@@ -117,8 +118,8 @@ export default function Approvals({ data, week, query, board, onDecided, reload,
                       onChange={(e) => { const v = e.target.value; setCounted((m) => ({ ...m, [s.id]: v })); }}
                     />
                   </label>
-                  <button className="btn btn-secondary" type="button" onClick={() => decide(s, 'reject')} disabled={working}>Reject</button>
-                  <button className="btn btn-primary" type="button" onClick={() => decide(s, 'approve')} disabled={working || settled}>
+                  <button className="btn btn-secondary" type="button" onClick={() => decide(s, 'reject')} disabled={working || busy}>Reject</button>
+                  <button className="btn btn-primary" type="button" onClick={() => decide(s, 'approve')} disabled={working || busy || settled}>
                     Approve
                   </button>
                 </div>

@@ -301,6 +301,10 @@ select.input {
 .form { display: grid; gap: 18px; }
 .textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .form-error { font-weight: 600; color: var(--neg); }
+/* Appears when Google is slow to answer (components/StillWorking.js). Empty, it is taken out of the layout, so it
+   adds no space in any parent, block, grid or flex, yet stays in the page for screen readers. */
+.still-working { margin-top: 10px; font-size: 0.9375rem; }
+.still-working:empty { position: absolute; }
 .form-ok { padding: 22px; border-left: 4px solid var(--maroon); background: var(--tint); }
 .form-ok:focus { outline: none; }
 .form-ok h2, .form-ok h3 { font-size: 1.375rem; }
@@ -421,6 +425,7 @@ select.input {
 .rec-foot { position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 0; margin-top: 8px; background: #fff; border-top: 1px solid var(--rule); }
 .rec-stats { flex: 1 1 260px; font-size: 0.9375rem; color: var(--muted); }
 .rec-stats b { color: var(--ink); }
+.rec-foot .still-working { flex-basis: 100%; margin-top: 0; }
 .tc-ok { color: var(--pos); }
 .tc-off { color: #8a5300; }
 .msg-ok { color: var(--pos); font-weight: 600; font-size: 0.9375rem; }

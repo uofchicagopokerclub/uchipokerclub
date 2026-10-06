@@ -34,7 +34,7 @@ function makeEnv() {
     console,
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, getUi: () => ui, flush() {} },
     CacheService: { getScriptCache: () => ({ get: k => cache.has(k) ? cache.get(k) : null, put: (k, v) => cache.set(k, v), remove: k => cache.delete(k) }) },
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    LockService: { getScriptLock: () => ({ waitLock() {}, tryLock: () => !ctx.__lockBusy, releaseLock() {} }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => props.has(k) ? props.get(k) : null, setProperty: (k, v) => props.set(k, v), deleteProperty: k => props.delete(k) }) },
     Utilities: {
       getUuid: () => crypto.randomUUID(),
@@ -61,6 +61,7 @@ function makeEnv() {
   ctx.__submissions = () => sheets.Submissions;
   ctx.__sent = [];
   ctx.__mailFails = false;
+  ctx.__lockBusy = false; // true: every tryLock times out, as when a long queue is waiting for the lock
   ctx.__props = props;
   ctx.__cache = cache;
   return ctx;

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { postToLedger } from '../lib/api';
 import { endSentence, nameKey, parseChips, signed, tone } from '../lib/ledger';
 import Approvals from './Approvals';
+import StillWorking from './StillWorking';
+import SubmitButton from './SubmitButton';
 
 // Board tool. The board password is checked by the Apps Script on every request; this page only
 // hides the form. Without "Remember", the password lives in memory and is gone on refresh.
@@ -47,6 +49,9 @@ export default function RecordResults() {
   const [query, setQuery] = useState('');
   const [msg, setMsg] = useState({ text: '', kind: '' });
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(0); // board requests in flight, for the footer's "Still working" line
+  // One board request at a time: a decision and a table save racing each other could overwrite one another.
+  const waiting = busy || pending > 0;
   const [codeEdit, setCodeEdit] = useState(null); // the meeting code being typed, or null when not editing
   const tableRef = useRef(null);
   const findRef = useRef(null);
@@ -71,8 +76,15 @@ export default function RecordResults() {
     setPhase('locked');
   }, []);
 
+  // timeout 0: the board tool waits for every answer, however slow (see lib/api.js).
   const board = useCallback(async (action, extra = {}) => {
-    const res = await postToLedger({ action, key: session.current.key, by: session.current.by, ...extra });
+    setPending((n) => n + 1);
+    let res;
+    try {
+      res = await postToLedger({ action, key: session.current.key, by: session.current.by, ...extra }, { timeout: 0 });
+    } finally {
+      setPending((n) => n - 1);
+    }
     if (res.auth) {
       lock(res.error);
       const err = new Error(res.error);
@@ -212,8 +224,10 @@ export default function RecordResults() {
   }
 
   async function save() {
+    // What is being sent, so entries typed while a slow save is in flight survive the reload after it.
+    const sent = new Map(changes.map((p) => [nameKey(p.name), edits.get(nameKey(p.name))]));
     const entries = changes.map((p) => {
-      const t = edits.get(nameKey(p.name));
+      const t = sent.get(nameKey(p.name));
       return { name: p.name, value: t.trim() === '' ? null : parseChips(t) };
     });
     setBusy(true);
@@ -224,7 +238,12 @@ export default function RecordResults() {
       if (r.saved) parts.push(`Saved ${r.saved} ${r.saved === 1 ? 'result' : 'results'}`);
       if (r.cleared) parts.push(`cleared ${r.cleared}`);
       const missing = r.missing || [];
-      await load({ keepWeek: week });
+      await load({ keepWeek: week, keepEdits: true });
+      setEdits((m) => {
+        const next = new Map(m);
+        sent.forEach((t, k) => { if (next.get(k) === t) next.delete(k); });
+        return next;
+      });
       if (missing.length) {
         setMsg({ text: `${parts.length ? `${parts.join(', ')}. ` : ''}Not saved, no longer on the ledger: ${missing.join(', ')}`, kind: 'err' });
       } else {
@@ -239,7 +258,7 @@ export default function RecordResults() {
 
   async function addPlayer() {
     const name = query.trim();
-    if (!name) return;
+    if (!name || waiting) return; // Enter in the find box reaches here even while a request is in flight
     setBusy(true);
     try {
       const r = await board('addPlayer', { name });
@@ -292,7 +311,7 @@ export default function RecordResults() {
     if (next) { next.focus(); next.select(); } else { findRef.current?.focus(); findRef.current?.select(); }
   }
 
-  if (phase === 'init') return <p className="ledger-state">Loading the board tool.</p>;
+  if (phase === 'init') return <><p className="ledger-state">Loading the board tool.</p><StillWorking busy /></>;
 
   if (phase === 'locked') {
     return (
@@ -312,7 +331,7 @@ export default function RecordResults() {
           Remember on this device for 30 days (your own device only)
         </label>
         {lockMsg && <p className="form-error" role="alert">{lockMsg}</p>}
-        <div><button className="btn btn-primary" type="submit" disabled={unlocking}>{unlocking ? 'Unlocking' : 'Unlock'}</button></div>
+        <div><SubmitButton busy={unlocking} busyLabel="Unlocking">Unlock</SubmitButton></div>
       </form>
     );
   }
@@ -354,7 +373,7 @@ export default function RecordResults() {
                 className="input" aria-label="New meeting code" maxLength={20} autoComplete="off" autoCapitalize="characters"
                 autoCorrect="off" spellCheck="false" value={codeEdit} onChange={(e) => setCodeEdit(e.target.value)}
               />
-              <button className="btn btn-primary" type="submit" disabled={busy}>Save code</button>
+              <button className="btn btn-primary" type="submit" disabled={waiting}>Save code</button>
               <button className="btn btn-secondary" type="button" onClick={() => setCodeEdit(null)}>Cancel</button>
             </form>
             <span className="field-help">Members need it to join and to log results. Set a new one at each meeting, and clear it when the meeting ends.</span>
@@ -400,11 +419,11 @@ export default function RecordResults() {
           }}
         />
         {q && !exact && (
-          <button className="btn btn-primary" type="button" onClick={addPlayer} disabled={busy}>Add &ldquo;{query.trim()}&rdquo;</button>
+          <button className="btn btn-primary" type="button" onClick={addPlayer} disabled={waiting}>Add &ldquo;{query.trim()}&rdquo;</button>
         )}
       </div>
 
-      <Approvals data={data} week={week} query={query} board={board} onDecided={onDecided} reload={reload} onShowWeek={showWeek} />
+      <Approvals data={data} week={week} query={query} board={board} busy={waiting} onDecided={onDecided} reload={reload} onShowWeek={showWeek} />
 
       {!data.players.length ? (
         <p className="ledger-state">No players yet. People join through the sign-up form, or type a name above and press Add.</p>
@@ -460,9 +479,11 @@ export default function RecordResults() {
         {changes.length > 0 && (
           <button className="btn btn-secondary" type="button" onClick={() => { setEdits(new Map()); setMsg({ text: 'Changes discarded.', kind: 'ok' }); }}>Discard</button>
         )}
-        <button className="btn btn-primary" type="button" onClick={save} disabled={busy || !changes.length || stats.bad}>
+        <button className="btn btn-primary" type="button" onClick={save} disabled={waiting || !changes.length || stats.bad}>
           {changes.length ? `Save ${changes.length}` : 'Save'}
         </button>
+        {/* Sticky at the bottom of the screen, so it shows wherever the board member tapped. */}
+        <StillWorking busy={pending > 0} />
       </div>
     </div>
   );

@@ -156,7 +156,7 @@ function doGet() {
 function doPost(e) {
   var raw = (e && e.postData && e.postData.contents) || "";
   if (raw.length > MAX_BODY) return json_({ ok: false, error: "Request too large." });
-  var busy = { ok: false, error: "The ledger is busy. Try again in a minute." };
+  var busy = { ok: false, error: BUSY };
 
   var data;
   try { data = JSON.parse(raw || "{}"); } catch (err) { data = null; }
@@ -225,7 +225,10 @@ function join_(data) {
   return withLock_(function () {
     var t = readTable_();
     if (t.players.length >= MAX_PLAYERS) return { ok: false, error: "Sign-ups are full. Ask a board member." };
-    if (t.players.some(function (p) { return p.email && p.email.toLowerCase() === email; })) {
+    var same = t.players.filter(function (p) { return p.email && p.email.toLowerCase() === email; })[0];
+    if (same) {
+      // The same sign-up again, usually a member trying again after a slow answer that did go through.
+      if (key_(same.name) === key_(n.value)) return { ok: true, name: same.name };
       return { ok: false, field: "email", error: "That email is already on the ledger. A board member can update your details." };
     }
     var i = indexOfKey_(t.players.map(function (p) { return p.name; }), n.value);
@@ -286,6 +289,11 @@ function submit_(data) {
     s.rows.forEach(function (r) {
       if (r.status === "pending" && key_(r.week) === key_(week) && key_(r.name) === key_(name)) mine = r;
     });
+    if (mine && mine.chips === chips && mine.stack === start) {
+      // The same count again, usually a member trying again after a slow answer that did go through. Nothing
+      // changes, so it neither uses up a log nor shows the board a change that did not happen.
+      return { ok: true, name: name, week: week, result: chips - start, replaced: false };
+    }
     if (mine && mine.times >= MAX_LOGS_PER_NIGHT) {
       return { ok: false, error: "You have logged " + week + " " + mine.times + " times. Show your chips to a board member." };
     }
@@ -851,10 +859,13 @@ function indexOfKey_(list, s) {
 function safe_(s) { return /^[=+\-@]/.test(s) ? "'" + s : s; }
 function clearCache_() { CacheService.getScriptCache().remove(CACHE_KEY); }
 
-// flush() before release: Sheets batches writes, and the next request to take the lock must read them.
+var BUSY = "The ledger is busy. Try again in a minute.";
+
+// flush() before release: Sheets batches writes, and the next request to take the lock must read them. A request
+// that waits 30 seconds for the lock answers with BUSY rather than Google's own lock-timeout text.
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  if (!lock.tryLock(30000)) throw new Error(BUSY);
   try { return fn(); } finally { SpreadsheetApp.flush(); lock.releaseLock(); }
 }
 

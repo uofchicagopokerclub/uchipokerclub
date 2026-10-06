@@ -27,6 +27,12 @@ ok("wrong code rejected before any field feedback", () => {
 });
 ok("code is case-insensitive", () => assert.strictEqual(join({ code: "poker26", name: "Jamie K.", email: "jamie@uchicago.edu", year: "2029" }).ok, true));
 ok("duplicate email rejected", () => assert.strictEqual(join({ name: "Other", email: "JAMIE@uchicago.edu", year: "2029" }).field, "email"));
+ok("the same sign-up sent again (a retry after a slow answer) succeeds and adds no row", () => {
+  const rows = G.__sheet().getLastRow();
+  const r = join({ name: "jamie k.", email: "Jamie@uchicago.edu", year: "2029" });
+  eq([r.ok, r.name], [true, "Jamie K."]);
+  eq(G.__sheet().getLastRow(), rows);
+});
 ok("duplicate name rejected", () => assert.strictEqual(join({ name: "jamie k.", email: "j2@uchicago.edu", year: "2029" }).field, "name"));
 ok("non-uchicago email rejected", () => assert.strictEqual(join({ name: "Zed", email: "zed@gmail.com", year: "2029" }).field, "email"));
 ok("formula and HTML names rejected", () => {
@@ -274,6 +280,11 @@ ok("a logged result waits as pending and stays off the public ledger", () => {
   assert.strictEqual(get().players.find((p) => p.name === "Jamie K.").results[1], null);
   eq(subRow("Jamie K.").slice(2, 10), ["Oct 16", "Jamie K.", 12500, 10000, 2500, "pending", 1, ""]);
 });
+ok("the same count sent again (a retry after a slow answer) changes nothing", () => {
+  const r = submit({ name: "Jamie K.", chips: 12500 });
+  eq([r.ok, r.result, r.replaced], [true, 2500, false]);
+  eq(subRow("Jamie K.").slice(4, 10), [12500, 10000, 2500, "pending", 1, ""]);
+});
 ok("logging again updates the same row and keeps the earlier number", () => {
   const rows = G.__submissions().getLastRow();
   const r = submit({ name: "Jamie K.", chips: 13000 });
@@ -285,6 +296,16 @@ ok("a member can log at most five times a night", () => {
   for (const chips of [13001, 13002, 13003]) eq(submit({ name: "Jamie K.", chips }).ok, true);
   assert.match(submit({ name: "Jamie K.", chips: 1 }).error, /5 times/);
   eq(subRow("Jamie K.").slice(4, 10), [13003, 10000, 3003, "pending", 5, 13002]);
+  eq([submit({ name: "Jamie K.", chips: 13003 }).ok, subRow("Jamie K.")[8]], [true, 5]); // a repeat is not a sixth log
+});
+ok("a request that cannot get the lock in time says the ledger is busy", () => {
+  G.__lockBusy = true;
+  try {
+    assert.match(submit({ name: "Robin S.", chips: 7000 }).error, /^The ledger is busy/);
+    assert.strictEqual(pendingFor("Robin S."), undefined);
+  } finally {
+    G.__lockBusy = false;
+  }
 });
 ok("the board tool opens on tonight and gets each waiting entry once, with no emails", () => {
   const d = admin("load").data;

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { postToLedger } from '../lib/api';
 import { endSentence, nameKey, signed, tone, wholeChips } from '../lib/ledger';
 import FormSuccess from './FormSuccess';
@@ -21,7 +21,7 @@ const NOT_READY = 'Logging is not switched on yet. Ask a board member.';
 // approved it in the board tool. Field names (code, name, chips) are the Apps Script contract. No hidden spam
 // field here: the meeting code keeps bots out, and a field a browser autofills would silently drop a real entry.
 export default function LogResultForm() {
-  const [meeting, setMeeting] = useState(null); // { week, startingStack, names } once the code is accepted
+  const [meeting, setMeeting] = useState(null); // { code, week, startingStack, names } once the code is accepted
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [remembered, setRemembered] = useState(false); // the name was filled in from this phone's memory
@@ -30,12 +30,24 @@ export default function LogResultForm() {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [sending, setSending] = useState(false);
-  const [logged, setLogged] = useState(null); // { result, replaced }
+  const [logged, setLogged] = useState(null); // { name, week, chips, result, replaced }, as sent
   const refs = { code: useRef(null), name: useRef(null), chips: useRef(null) };
+  // The field to focus once the next step is on screen. A timer can fire before React has drawn it.
+  const focusNext = useRef(null);
 
+  useEffect(() => {
+    const field = focusNext.current;
+    if (!field) return;
+    focusNext.current = null;
+    refs[field]?.current?.focus();
+  });
+
+  // Focus the field now if it is on screen (inside the tap, so iOS opens the keyboard), or once a step change has
+  // drawn it.
   function fail(field, msg) {
     setErrors({ [field]: msg });
-    refs[field]?.current?.focus();
+    const el = refs[field]?.current;
+    if (el) el.focus(); else focusNext.current = field;
   }
 
   async function openMeeting(e) {
@@ -43,18 +55,20 @@ export default function LogResultForm() {
     setErrors({});
     setFormError('');
     if (!code.trim()) return fail('code', 'Enter the meeting code.');
+    // The fields stay editable during a slow answer, so what was sent is kept, not what is in them afterwards.
+    const checked = code;
     setSending(true);
     try {
-      const res = await postToLedger({ action: 'roster', code });
+      const res = await postToLedger({ action: 'roster', code: checked });
       if (res.auth) return setFormError(NOT_READY);
       if (!res.ok) return res.field ? fail(res.field, res.error) : setFormError(res.error || 'Something went wrong. Try again.');
-      setMeeting({ week: res.week, startingStack: res.startingStack, names: res.names });
+      setMeeting({ code: checked, week: res.week, startingStack: res.startingStack, names: res.names });
       // A name already picked (the code changed mid-meeting) stays; otherwise offer the one this phone remembers.
       const kept = res.names.find((n) => nameKey(n) === nameKey(name));
       const fromMemory = !kept && !shared ? res.names.find((n) => nameKey(n) === nameKey(readName())) : '';
       setName(kept || fromMemory || '');
       setRemembered(Boolean(fromMemory));
-      setTimeout(() => (kept ? refs.chips : refs.name).current?.focus(), 0);
+      focusNext.current = kept ? 'chips' : 'name';
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -71,18 +85,19 @@ export default function LogResultForm() {
     setFormError('');
     if (!name) return fail('name', 'Pick your name.');
     if (count === null) return fail('chips', 'Enter the number of chips in front of you.');
+    const sent = { name, week: meeting.week, chips: count, result };
     setSending(true);
     try {
-      const res = await postToLedger({ action: 'submit', code, name, chips: count });
+      const res = await postToLedger({ action: 'submit', code: meeting.code, name: sent.name, chips: sent.chips });
       if (res.auth) return setFormError(NOT_READY);
       if (res.ok) {
         // Only the phone's owner is remembered, never the next person it was handed to.
-        if (!shared) writeName(name);
-        setLogged({ result: typeof res.result === 'number' ? res.result : result, replaced: Boolean(res.replaced) });
+        if (!shared) writeName(sent.name);
+        setLogged({ ...sent, result: typeof res.result === 'number' ? res.result : sent.result, replaced: Boolean(res.replaced) });
       } else if (res.field === 'code') {
         // The board changed the code during the meeting: back to step one with the reason.
         setMeeting(null);
-        setTimeout(() => fail('code', res.error), 0);
+        fail('code', res.error);
       } else if (res.field) {
         fail(res.field, res.error);
       } else {
@@ -101,15 +116,15 @@ export default function LogResultForm() {
     setName('');
     setRemembered(false);
     setChips('');
-    setTimeout(() => refs.name.current?.focus(), 0);
+    focusNext.current = 'name';
   }
 
   if (logged) {
     return (
       <FormSuccess>
-        <h2>{endSentence(`Logged, ${name}`)}</h2>
+        <h2>{endSentence(`Logged, ${logged.name}`)}</h2>
         <p>
-          {meeting.week}: {count.toLocaleString('en-US')} chips, {signed(logged.result)}.
+          {logged.week}: {logged.chips.toLocaleString('en-US')} chips, {signed(logged.result)}.
           {logged.replaced ? ' This replaces your earlier entry.' : ''}
         </p>
         <p>Show your chips to a board member. Your result counts once they approve it.</p>

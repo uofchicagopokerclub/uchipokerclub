@@ -105,6 +105,11 @@ Logging is open from 4 p.m. to 4 a.m. Chicago on the date in a week column's lab
 only accepts labels like that. A meeting moved to another day needs its own week column, or the board table.
 Entries still waiting after the night stay in the board tool; it opens on that week until they are handled.
 
+Google is sometimes slow, up to about a minute for one answer. After a few seconds every form says "Still working".
+Members' forms stop waiting after a minute and keep what was typed; sending again is safe, because the backend
+recognizes a log or sign-up it already has. The board tool waits for every answer and handles one request at a time,
+so let it finish rather than refreshing the page.
+
 ## Everyday
 
 - **Change the site:** edit `content/club.js` on github.com (pencil icon), commit to `main`. Live in about a minute.
