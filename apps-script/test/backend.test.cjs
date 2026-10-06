@@ -138,10 +138,10 @@ ok("unnamed board user is logged as such", () => {
 });
 console.log(" mailing list");
 const sub = (o) => post(Object.assign({ action: "subscribe" }, o));
-ok("subscribe stores first, last, email in the Mailing list tab", () => {
+ok("subscribe stores email, first, last in the Mailing list tab", () => {
   eq(sub({ fname: " Ada ", lname: "Lovelace", email: "Ada@Example.com" }), { ok: true });
   const row = G.__list().g[1];
-  eq([row[0], row[1], row[2], row[4]], ["Ada", "Lovelace", "ada@example.com", "website"]);
+  eq([row[0], row[1], row[2], row[4]], ["ada@example.com", "Ada", "Lovelace", "website"]);
 });
 ok("repeat email answers ok without a second row", () => {
   const before = G.__list().getLastRow();
@@ -161,7 +161,30 @@ ok("subscribe honeypot writes nothing", () => {
   assert.strictEqual(G.__list().getLastRow(), before);
 });
 ok("the mailing list never appears in the public feed", () => assert.ok(!JSON.stringify(get()).includes("example.com")));
-ok("setup creates the Mailing list tab with headers", () => eq(G.__list().g[0], ["First Name", "Last Name", "Email", "Joined", "Source"]));
+ok("setup creates the Mailing list tab with headers", () => eq(G.__list().g[0], ["Email", "First Name", "Last Name", "Joined", "Source"]));
+const listEnv = () => {
+  const H = makeEnv();
+  H.setupSheet();
+  H.post = (b) => JSON.parse(H.doPost({ postData: { contents: JSON.stringify(b) } }).getContent());
+  return H;
+};
+ok("the form writes by header name, so columns the board reorders stay right", () => {
+  const H = listEnv(), sh = H.__list();
+  sh.g[0] = ["First Name", "Email", "Last Name", "Joined", "Source", "Notes"];
+  eq(H.post({ action: "subscribe", fname: "Bo", lname: "Diaz", email: "bo@x.com" }), { ok: true });
+  eq([sh.g[1][0], sh.g[1][1], sh.g[1][2], sh.g[1][4]], ["Bo", "bo@x.com", "Diaz", "website"]);
+  eq(H.post({ action: "subscribe", fname: "Bo", lname: "D", email: " BO@x.com " }), { ok: true });
+  eq(sh.getLastRow(), 2); // the repeat is found in the Email column, wherever it is
+});
+ok("set up puts back rows the old form wrote out of order, and leaves the rest alone", () => {
+  const H = listEnv(), sh = H.__list();
+  sh.g.push(["dan@uchicago.edu", "Daniel", "Steiner", "2026-09-27 22:20", "old mailing list"]);
+  sh.g.push(["Joyce", "Li", "jxli@uchicago.edu", "2026-10-05 23:37", "website", "a note"]);
+  H.setupSheet();
+  eq(sh.g[1], ["dan@uchicago.edu", "Daniel", "Steiner", "2026-09-27 22:20", "old mailing list", ""]);
+  eq(sh.g[2], ["jxli@uchicago.edu", "Joyce", "Li", "2026-10-05 23:37", "website", "a note"]);
+  eq(H.repairListRows_(), 0);
+});
 console.log(" sponsor inquiries");
 const sponsor = (o) => post(Object.assign({ action: "sponsor" }, o));
 ok("sponsor inquiry is saved to the Sponsor inquiries tab and nothing is emailed", () => {

@@ -25,7 +25,9 @@ so commits never carry another account's email.
 2. Extensions > Apps Script. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo. Save.
 3. Reload the Sheet. A **Ledger** menu appears:
    - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries and
-     Submissions tabs. Safe to run again: it only adds what is missing.
+     Submissions tabs. Safe to run again: it only adds what is missing, and puts back any mailing list row that
+     an older version wrote out of column order. The mailing list columns can be reordered freely: sign-ups are
+     written by header name (Email, First Name, Last Name, Joined, Source).
    - **New board password**. Shown once: copy it into the board group chat.
    - **Set meeting code**. 6 to 20 letters or numbers. Members need it to join and to log results. It can also be
      changed from the board tool, which is easier at a meeting (the Ledger menu does not exist in the Sheets phone app).

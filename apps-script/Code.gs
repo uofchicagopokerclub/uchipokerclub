@@ -87,11 +87,11 @@ function setupSheet() {
   sheet.setFrozenRows(1);
   sheet.setFrozenColumns(1);
   logSheet_();
-  listSheet_();
+  var repaired = repairListRows_();
   sponsorSheet_();
   var submissions = submitSheet_();
   submissions.getRange(1, 3, submissions.getMaxRows(), 2).setNumberFormat("@"); // rows added since creation too
-  ss.toast("Ledger sheet is ready.", "Ledger");
+  ss.toast("Ledger sheet is ready." + (repaired ? " Fixed the column order of " + repaired + " mailing list row" + (repaired === 1 ? "." : "s.") : ""), "Ledger");
 }
 
 function newBoardPasswordPrompt() {
@@ -402,7 +402,7 @@ function tonight_(weeks) {
 
 /* ---------- Mailing list ---------- */
 
-// Footer form on every page: First Name, Last Name, Email Address. Any email domain.
+// Footer form on every page: First Name, Last Name, Email Address. Any email domain. Stored as LIST_HEADER below.
 // A repeat sign-up answers exactly like a new one, so the form never reveals who is on the list.
 function subscribe_(data) {
   if (data.website) return { ok: true }; // honeypot
@@ -415,14 +415,52 @@ function subscribe_(data) {
   if (!emailOk) return { ok: false, field: "email", error: "Enter a valid email address." };
 
   return withLock_(function () {
-    var sheet = listSheet_();
+    var sheet = listSheet_(), col = listColumns_(sheet);
     var rows = sheet.getLastRow() - 1;
-    var emails = rows > 0 ? sheet.getRange(2, 3, rows, 1).getValues() : [];
-    if (emails.some(function (r) { return String(r[0]).toLowerCase() === email; })) return { ok: true };
+    var emails = rows > 0 ? sheet.getRange(2, col[0] + 1, rows, 1).getValues() : [];
+    if (emails.some(function (r) { return clean_(r[0]).toLowerCase() === email; })) return { ok: true };
     if (rows >= MAX_SUBSCRIBERS) return { ok: false, error: "The mailing list is full. Email the club instead." };
-    sheet.appendRow([safe_(first.value), safe_(last.value), safe_(email), new Date(), "website"]);
+    sheet.appendRow(listRow_(col, [safe_(email), safe_(first.value), safe_(last.value), new Date(), "website"]));
     return { ok: true };
   });
+}
+
+// The Mailing list tab's fields, in the order a new tab gets them. The board can reorder the columns in the Sheet:
+// the form reads the header row to find each one, so a sign-up never lands in the wrong column.
+var LIST_HEADER = ["Email", "First Name", "Last Name", "Joined", "Source"];
+// Before 2026-10-06 the form wrote First Name, Last Name, Email, Joined, Source whatever the header said.
+var LIST_LEGACY = [2, 0, 1, 3, 4]; // where each LIST_HEADER field sat in that old order
+
+// Column index (0-based) of each LIST_HEADER field, by header name; a header it cannot find keeps the default spot.
+function listColumns_(sheet) {
+  var width = Math.max(sheet.getLastColumn(), LIST_HEADER.length);
+  var header = sheet.getRange(1, 1, 1, width).getDisplayValues()[0].map(key_);
+  return LIST_HEADER.map(function (h, i) { var at = header.indexOf(key_(h)); return at >= 0 ? at : i; });
+}
+
+// values in LIST_HEADER order -> a row with each value in its column.
+function listRow_(col, values) {
+  var row = [];
+  values.forEach(function (v, i) { row[col[i]] = v; });
+  for (var j = 0; j < row.length; j++) if (row[j] === undefined) row[j] = "";
+  return row;
+}
+
+// Puts back rows the form wrote in the old fixed order after the board had moved the Email column: the email sits
+// where the old order put it, and the current Email column holds no address. Run from Set up sheet; a no-op once fixed.
+function repairListRows_() {
+  var sheet = listSheet_(), col = listColumns_(sheet), rows = sheet.getLastRow() - 1;
+  if (rows < 1 || col[0] === LIST_LEGACY[0]) return 0;
+  var width = Math.max(sheet.getLastColumn(), LIST_HEADER.length);
+  var range = sheet.getRange(2, 1, rows, width), values = range.getValues(), fixed = 0;
+  values.forEach(function (r) {
+    if (String(r[col[0]]).indexOf("@") >= 0 || String(r[LIST_LEGACY[0]]).indexOf("@") < 0) return;
+    var old = LIST_LEGACY.map(function (at) { return r[at]; });
+    old.forEach(function (v, i) { r[col[i]] = v; });
+    fixed++;
+  });
+  if (fixed) range.setValues(values);
+  return fixed;
 }
 
 function validPersonName_(raw, max) {
@@ -438,7 +476,7 @@ function listSheet_() {
   var sheet = ss.getSheetByName(LIST_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(LIST_NAME);
-    sheet.getRange(1, 1, 1, 5).setValues([["First Name", "Last Name", "Email", "Joined", "Source"]]).setFontWeight("bold");
+    sheet.getRange(1, 1, 1, LIST_HEADER.length).setValues([LIST_HEADER]).setFontWeight("bold");
     sheet.getRange(1, 1, sheet.getMaxRows(), 3).setNumberFormat("@");
     sheet.setFrozenRows(1);
   }
