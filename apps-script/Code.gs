@@ -410,8 +410,8 @@ function tonight_(weeks) {
 
 /* ---------- Mailing list ---------- */
 
-// Footer form on every page: First Name, Last Name, Email Address. Any email domain. Stored as LIST_HEADER below.
-// A repeat sign-up answers exactly like a new one, so the form never reveals who is on the list.
+// Footer form on every page: First Name, Last Name, Email Address, Class Year, Major. Any email domain. Stored as
+// LIST_HEADER below. A repeat sign-up answers exactly like a new one, so the form never reveals who is on the list.
 function subscribe_(data) {
   if (data.website) return { ok: true }; // honeypot
   var first = validPersonName_(data.fname, 30);
@@ -421,6 +421,16 @@ function subscribe_(data) {
   var email = clean_(data.email).toLowerCase();
   var emailOk = /^[a-z0-9][a-z0-9._%+-]*@[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(email) && email.length <= 120;
   if (!emailOk) return { ok: false, field: "email", error: "Enter a valid email address." };
+  // Class years only: the mailing list has no "Other", unlike the ledger sign-up. A page loaded before these fields
+  // existed (2026-10-07) sends neither; its sign-up is saved with both blank rather than failing with no visible error.
+  var year = clean_(data.year), major = clean_(data.major);
+  if (data.year !== undefined || data.major !== undefined) {
+    if (year === "Other" || YEARS.indexOf(year) < 0) return { ok: false, field: "year", error: "Pick your class year." };
+    if (!major) return { ok: false, field: "major", error: "Enter your major. Undeclared is fine." };
+    if (major.length > 60 || !COMPANY_RE.test(major)) { // the same characters a company name allows
+      return { ok: false, field: "major", error: "Use letters, spaces and basic punctuation, up to 60 characters." };
+    }
+  }
 
   return withLock_(function () {
     var sheet = listSheet_(), col = listColumns_(sheet);
@@ -428,22 +438,33 @@ function subscribe_(data) {
     var emails = rows > 0 ? sheet.getRange(2, col[0] + 1, rows, 1).getValues() : [];
     if (emails.some(function (r) { return clean_(r[0]).toLowerCase() === email; })) return { ok: true };
     if (rows >= MAX_SUBSCRIBERS) return { ok: false, error: "The mailing list is full. Email the club instead." };
-    sheet.appendRow(listRow_(col, [safe_(email), safe_(first.value), safe_(last.value), new Date(), "website"]));
+    sheet.appendRow(listRow_(col, [safe_(email), safe_(first.value), safe_(last.value), new Date(), "website", year,
+      safe_(major)]));
     return { ok: true };
   });
 }
 
 // The Mailing list tab's fields, in the order a new tab gets them. The board can reorder the columns in the Sheet:
-// the form reads the header row to find each one, so a sign-up never lands in the wrong column.
-var LIST_HEADER = ["Email", "First Name", "Last Name", "Joined", "Source"];
+// the form reads the header row to find each one, so a sign-up never lands in the wrong column. Fields added later
+// (Class Year and Major, 2026-10-07) go at the end, so LIST_LEGACY's positions still line up with the first five.
+var LIST_HEADER = ["Email", "First Name", "Last Name", "Joined", "Source", "Class Year", "Major"];
 // Before 2026-10-06 the form wrote First Name, Last Name, Email, Joined, Source whatever the header said.
 var LIST_LEGACY = [2, 0, 1, 3, 4]; // where each LIST_HEADER field sat in that old order
 
-// Column index (0-based) of each LIST_HEADER field, by header name; a header it cannot find keeps the default spot.
+// Column index (0-based) of each LIST_HEADER field, by header name. A field the header row lacks (the tab predates
+// it) gets a new column after every column in use, header included, so it never lands on someone's data.
 function listColumns_(sheet) {
-  var width = Math.max(sheet.getLastColumn(), LIST_HEADER.length);
-  var header = sheet.getRange(1, 1, 1, width).getDisplayValues()[0].map(key_);
-  return LIST_HEADER.map(function (h, i) { var at = header.indexOf(key_(h)); return at >= 0 ? at : i; });
+  var width = sheet.getLastColumn();
+  var header = width ? sheet.getRange(1, 1, 1, width).getDisplayValues()[0].map(key_) : [];
+  return LIST_HEADER.map(function (h) {
+    var at = header.indexOf(key_(h));
+    if (at < 0) {
+      at = header.length;
+      header.push(key_(h));
+      sheet.getRange(1, at + 1).setValue(h).setFontWeight("bold");
+    }
+    return at;
+  });
 }
 
 // values in LIST_HEADER order -> a row with each value in its column.

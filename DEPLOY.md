@@ -27,7 +27,8 @@ so commits never carry another account's email.
    - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries and
      Submissions tabs. Safe to run again: it only adds what is missing, and puts back any mailing list row that
      an older version wrote out of column order. The mailing list columns can be reordered freely: sign-ups are
-     written by header name (Email, First Name, Last Name, Joined, Source).
+     written by header name (Email, First Name, Last Name, Joined, Source, Class Year, Major). A header that is
+     missing is added after the last column in use, by Set up sheet or by the next sign-up.
    - **New board password**. Shown once: copy it into the board group chat.
    - **Set meeting code**. 6 to 20 letters or numbers. Members need it to join and to log results. It can also be
      changed from the board tool, which is easier at a meeting (the Ledger menu does not exist in the Sheets phone app).

@@ -143,11 +143,23 @@ ok("unnamed board user is logged as such", () => {
   assert.ok(G.__log().g.slice(-1)[0][3] === "board (unnamed)");
 });
 console.log(" mailing list");
-const sub = (o) => post(Object.assign({ action: "subscribe" }, o));
-ok("subscribe stores email, first, last in the Mailing list tab", () => {
-  eq(sub({ fname: " Ada ", lname: "Lovelace", email: "Ada@Example.com" }), { ok: true });
+const sub = (o) => post(Object.assign({ action: "subscribe", year: "2028", major: "Economics" }, o));
+ok("subscribe stores email, first, last, class year and major in the Mailing list tab", () => {
+  eq(sub({ fname: " Ada ", lname: "Lovelace", email: "Ada@Example.com", year: "2029", major: " Computer  Science " }), { ok: true });
   const row = G.__list().g[1];
-  eq([row[0], row[1], row[2], row[4]], ["ada@example.com", "Ada", "Lovelace", "website"]);
+  eq([row[0], row[1], row[2], row[4], row[5], row[6]], ["ada@example.com", "Ada", "Lovelace", "website", "2029", "Computer Science"]);
+});
+ok("subscribe needs a class year from 2027 to 2030 (no Other) and a major", () => {
+  for (const year of ["", "Other", "2026", "2031", "=1+1"]) eq(sub({ fname: "A", lname: "B", email: "y@x.com", year }).field, "year");
+  eq(sub({ fname: "A", lname: "B", email: "y@x.com", major: "" }).field, "major");
+  eq(sub({ fname: "A", lname: "B", email: "y@x.com", major: "=HYPERLINK(1)" }).field, "major");
+  eq(sub({ fname: "A", lname: "B", email: "y@x.com", major: "M".repeat(61) }).field, "major");
+  eq(sub({ fname: "A", lname: "B", email: "y@x.com", year: "2027", major: "Law, Letters, and Society / Econ" }).ok, true);
+});
+ok("a page from before class year and major still signs up, with both blank", () => {
+  eq(post({ action: "subscribe", fname: "Old", lname: "Page", email: "old.page@x.com" }), { ok: true });
+  const row = G.__list().g.find((r) => r && r[0] === "old.page@x.com");
+  eq([row[5], row[6]], ["", ""]);
 });
 ok("repeat email answers ok without a second row", () => {
   const before = G.__list().getLastRow();
@@ -167,11 +179,11 @@ ok("subscribe honeypot writes nothing", () => {
   assert.strictEqual(G.__list().getLastRow(), before);
 });
 ok("the mailing list never appears in the public feed", () => assert.ok(!JSON.stringify(get()).includes("example.com")));
-ok("setup creates the Mailing list tab with headers", () => eq(G.__list().g[0], ["Email", "First Name", "Last Name", "Joined", "Source"]));
+ok("setup creates the Mailing list tab with headers", () => eq(G.__list().g[0], ["Email", "First Name", "Last Name", "Joined", "Source", "Class Year", "Major"]));
 const listEnv = () => {
   const H = makeEnv();
   H.setupSheet();
-  H.post = (b) => JSON.parse(H.doPost({ postData: { contents: JSON.stringify(b) } }).getContent());
+  H.post = (b) => JSON.parse(H.doPost({ postData: { contents: JSON.stringify(Object.assign({ year: "2028", major: "History" }, b)) } }).getContent());
   return H;
 };
 ok("the form writes by header name, so columns the board reorders stay right", () => {
@@ -182,13 +194,24 @@ ok("the form writes by header name, so columns the board reorders stay right", (
   eq(H.post({ action: "subscribe", fname: "Bo", lname: "D", email: " BO@x.com " }), { ok: true });
   eq(sh.getLastRow(), 2); // the repeat is found in the Email column, wherever it is
 });
+ok("a tab made before Class Year and Major gets those columns after its last column, never over data", () => {
+  const H = listEnv(), sh = H.__list();
+  sh.g[0] = ["Email", "First Name", "Last Name", "Joined", "Source"];
+  sh.g[1] = ["old@x.com", "Old", "Member", "2026-01-01", "old mailing list", "a note in an unnamed column"];
+  eq(H.post({ action: "subscribe", fname: "Cy", lname: "Ng", email: "cy@x.com", year: "2030", major: "Physics" }), { ok: true });
+  eq([sh.g[0][5], sh.g[0][6], sh.g[0][7]], [undefined, "Class Year", "Major"]);
+  eq(sh.g[1][5], "a note in an unnamed column");
+  eq([sh.g[2][0], sh.g[2][6], sh.g[2][7]], ["cy@x.com", "2030", "Physics"]);
+  eq(H.post({ action: "subscribe", fname: "Di", lname: "Ma", email: "di@x.com" }).ok, true);
+  eq(sh.g[0].length, 8); // added once, then found by name
+});
 ok("set up puts back rows the old form wrote out of order, and leaves the rest alone", () => {
   const H = listEnv(), sh = H.__list();
   sh.g.push(["dan@uchicago.edu", "Daniel", "Steiner", "2026-09-27 22:20", "old mailing list"]);
   sh.g.push(["Joyce", "Li", "jxli@uchicago.edu", "2026-10-05 23:37", "website", "a note"]);
   H.setupSheet();
-  eq(sh.g[1], ["dan@uchicago.edu", "Daniel", "Steiner", "2026-09-27 22:20", "old mailing list", ""]);
-  eq(sh.g[2], ["jxli@uchicago.edu", "Joyce", "Li", "2026-10-05 23:37", "website", "a note"]);
+  eq(sh.g[1], ["dan@uchicago.edu", "Daniel", "Steiner", "2026-09-27 22:20", "old mailing list", "", ""]);
+  eq(sh.g[2], ["jxli@uchicago.edu", "Joyce", "Li", "2026-10-05 23:37", "website", "a note", ""]);
   eq(H.repairListRows_(), 0);
 });
 console.log(" sponsor inquiries");

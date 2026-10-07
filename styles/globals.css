@@ -291,6 +291,9 @@ main > :last-child { padding-bottom: 0; }
   -webkit-appearance: none; appearance: none;
 }
 .input::placeholder { color: var(--subtle); opacity: 1; }
+/* A select still on its prompt option ("Class Year") reads as a placeholder, like the inputs beside it. */
+select.input[data-empty] { color: var(--subtle); }
+select.input option { color: var(--ink); }
 .input:focus { outline: 2px solid var(--maroon); outline-offset: -1px; border-color: var(--maroon); }
 .input[aria-invalid='true'] { border-color: var(--neg); }
 select.input {
