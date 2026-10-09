@@ -174,6 +174,8 @@ export default function RecordResults() {
   }, [edits, netFor, shown]);
 
   const changes = useMemo(() => (data ? data.players.filter(isChanged) : []), [data, isChanged]);
+  // The stack members log against is saved with results, so it can also be saved on its own.
+  const stackChanged = Boolean(data) && start !== (data.startingStack || 0);
 
   const stats = useMemo(() => {
     let played = 0, net = 0;
@@ -247,7 +249,8 @@ export default function RecordResults() {
       if (missing.length) {
         setMsg({ text: `${parts.length ? `${parts.join(', ')}. ` : ''}Not saved, no longer on the ledger: ${missing.join(', ')}`, kind: 'err' });
       } else {
-        setMsg({ text: `${parts.join(', ') || 'No changes'} for ${r.week}.`, kind: 'ok' });
+        if (!parts.length && stackChanged) setMsg({ text: `Starting stack saved: ${start ? start.toLocaleString('en-US') : 'none (profit or loss)'}.`, kind: 'ok' });
+        else setMsg({ text: `${parts.join(', ') || 'No changes'} for ${r.week}.`, kind: 'ok' });
       }
     } catch (err) {
       setMsg({ text: err.message, kind: 'err' });
@@ -479,7 +482,7 @@ export default function RecordResults() {
         {changes.length > 0 && (
           <button className="btn btn-secondary" type="button" onClick={() => { setEdits(new Map()); setMsg({ text: 'Changes discarded.', kind: 'ok' }); }}>Discard</button>
         )}
-        <button className="btn btn-primary" type="button" onClick={save} disabled={waiting || !changes.length || stats.bad}>
+        <button className="btn btn-primary" type="button" onClick={save} disabled={waiting || (!changes.length && !stackChanged) || stats.bad}>
           {changes.length ? `Save ${changes.length}` : 'Save'}
         </button>
         {/* Sticky at the bottom of the screen, so it shows wherever the board member tapped. */}
