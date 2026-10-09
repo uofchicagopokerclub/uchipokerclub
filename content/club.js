@@ -56,7 +56,7 @@ export const home = {
       text: 'A room full of people who want to get better at the same game. No experience needed to walk in.',
     },
   ],
-  ledgerText: 'Every member starts each meeting with 10,000 chips. At the end you log your chips here, a board member checks your stack, and results add up across the term.',
+  ledgerText: 'Every member starts each meeting with 7,500 chips. At the end you log your chips here, a board member checks your stack, and results add up across the term.',
 };
 
 export const cohort = {
@@ -96,7 +96,7 @@ export const about = {
     },
     {
       title: 'Live play',
-      text: 'Every member starts each session with 10,000 chips.',
+      text: 'Every member starts each session with 7,500 chips.',
     },
     {
       title: 'Paper profit and loss',

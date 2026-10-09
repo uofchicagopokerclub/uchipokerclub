@@ -92,7 +92,8 @@ Defaults preset.
 1. Before it starts, open www.uchipokerclub.com/ledger/record on your phone (board password), set a new
    **meeting code**, and show it in the room with the address uchipokerclub.com/ledger/log.
 2. New members join at /ledger/join with the same code. At the end, everyone logs their chips at /ledger/log.
-   Members always log chip counts against a 10,000 stack, whatever the board tool's Starting stack field says.
+   Members log chip counts against the starting stack: 7,500 unless the board saved another number in the board
+   tool's Starting stack field (it is saved along with results). Check that field shows the right stack before members log.
 3. Each player shows you their stack. In the board tool's **To approve** list, type their name in the find box,
    check the chips, correct **Chips counted** if needed, and press **Approve**. **Reject** if it is wrong; they can
    log again. A card that says "Changed from" was logged more than once: make sure the person in front of you is
