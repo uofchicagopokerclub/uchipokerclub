@@ -26,6 +26,17 @@ ok("wrong code rejected before any field feedback", () => {
   assert.strictEqual(r.field, "code");
 });
 ok("code is case-insensitive", () => assert.strictEqual(join({ code: "poker26", name: "Jamie K.", email: "jamie@uchicago.edu", year: "2029" }).ok, true));
+ok("a sign-up stores the major in the Major column, and needs one", () => {
+  eq(join({ name: "Mo R.", email: "mo@uchicago.edu", year: "2028", major: "" }).field, "major");
+  eq(join({ name: "Mo R.", email: "mo@uchicago.edu", year: "2028", major: "=HYPERLINK(1)" }).field, "major");
+  eq(join({ name: "Mo R.", email: "mo@uchicago.edu", year: "2028", major: " Economics  " }).ok, true);
+  const row = G.__sheet().g.find((x) => x && x[0] === "Mo R.");
+  eq([G.__sheet().g[0][5], row[5]], ["Major", "Economics"]);
+});
+ok("a page from before the major field still signs up, with the major blank", () => {
+  eq(join({ name: "Old Page", email: "oldpage@uchicago.edu", year: "2029" }).ok, true);
+  eq(G.__sheet().g.find((x) => x && x[0] === "Old Page")[5], "");
+});
 ok("duplicate email rejected", () => assert.strictEqual(join({ name: "Other", email: "JAMIE@uchicago.edu", year: "2029" }).field, "email"));
 ok("the same sign-up sent again (a retry after a slow answer) succeeds and adds no row", () => {
   const rows = G.__sheet().getLastRow();
@@ -128,7 +139,7 @@ ok("blank row between players does not shift writes", () => {
   const sh = G.__sheet(); sh.g.splice(2, 0, []);
   admin("save", { week: "Oct 23", entries: [{ name: "Walk In", value: 900 }] });
   const r = sh.g.findIndex(x => x && x[0] === "Walk In");
-  assert.strictEqual(sh.g[r][7], 900);
+  assert.strictEqual(sh.g[r][8], 900); // Name..Source, Major, then Oct 9, Oct 16, Oct 23
 });
 ok("every write is in the Log tab with who did it", () => {
   const rows = G.__log().g.slice(1).map(r => r.slice(1).join(" | "));
@@ -141,6 +152,25 @@ ok("every write is in the Log tab with who did it", () => {
 ok("unnamed board user is logged as such", () => {
   post({ action: "addPlayer", key: KEY, name: "Nobody Named", by: "<b>" });
   assert.ok(G.__log().g.slice(-1)[0][3] === "board (unnamed)");
+});
+ok("set up inserts Major into a tab made before it, and every week keeps its results", () => {
+  const H = makeEnv();
+  H.setupSheet();
+  const sh = H.__sheet();
+  sh.g = [["Name", "Email", "Year", "Joined", "Source", "Oct 9", "Oct 16"], ["Ann", "ann@uchicago.edu", "2028", "", "form", 500, -200]];
+  const code = H.setMeetingCode_("POKER26", "test").code, hpost = (b) => JSON.parse(H.doPost({ postData: { contents: JSON.stringify(b) } }).getContent());
+  eq(JSON.parse(H.doGet().getContent()).players[0].results.slice(0, 2), [500, -200]); // before: read without Major
+  hpost({ code, name: "Before Setup", email: "b4@uchicago.edu", year: "2029", major: "Math" });
+  eq(sh.g[2].length, 5); // no Major column yet, so nothing lands on a week
+  H.setupSheet();
+  eq(sh.g[0].slice(0, 7), ["Name", "Email", "Year", "Joined", "Source", "Major", "Oct 9"]);
+  eq([sh.g[1][5], sh.g[1][6], sh.g[1][7]], ["", 500, -200]);
+  H.__cache.clear();
+  eq(JSON.parse(H.doGet().getContent()).players[0].results.slice(0, 2), [500, -200]);
+  hpost({ code, name: "After Setup", email: "after@uchicago.edu", year: "2029", major: "Math" });
+  eq(sh.g.find((x) => x && x[0] === "After Setup")[5], "Math");
+  H.setupSheet();
+  eq(sh.g[0].filter((h) => h === "Major").length, 1); // running it again changes nothing
 });
 console.log(" mailing list");
 const sub = (o) => post(Object.assign({ action: "subscribe", year: "2028", major: "Economics" }, o));

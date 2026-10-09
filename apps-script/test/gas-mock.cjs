@@ -19,6 +19,7 @@ function makeEnv() {
     getLastColumn() { let l = 0; this.g.forEach(row => (row || []).forEach((v, j) => { if (v !== "" && v !== undefined) l = Math.max(l, j + 1); })); return l; }
     getMaxRows() { return 1000; }
     appendRow(a) { const r = this.getLastRow() + 1; a.forEach((v, j) => this.set(r, j + 1, v)); return this; }
+    insertColumnAfter(c) { this.g.forEach((row) => { if (row && row.length > c) row.splice(c, 0, ""); }); }
     setFrozenRows() {} setFrozenColumns() {}
   }
   const sheets = {};

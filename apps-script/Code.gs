@@ -43,7 +43,10 @@ var SUBMIT_NAME = "Submissions";
 var TIME_ZONE = "America/Chicago"; // meeting days are Chicago dates
 // Shown to visitors when a form cannot take their details. This script never sends email.
 var CLUB_EMAIL = "UofChicagoPokerClub@gmail.com";
-var FIXED = ["Name", "Email", "Year", "Joined", "Source"]; // columns A to E; weeks start at F
+var FIXED = ["Name", "Email", "Year", "Joined", "Source"]; // columns A to E, then Major (F), then the weeks
+// Major was added 2026-10-09. A Players tab made before then has no Major column until Ledger > Set up sheet inserts
+// it, so every reader and writer finds the first week column through readTable_'s fixed count, never FIXED.length.
+var MAJOR = "Major";
 var WEEKS = ["Oct 9", "Oct 16", "Oct 23", "Oct 30", "Nov 6", "Nov 13", "Nov 20"];
 var EMAIL_DOMAIN = "uchicago.edu"; // set to "" to accept any email address
 var YEARS = ["2027", "2028", "2029", "2030", "Other"];
@@ -78,8 +81,14 @@ function setupSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
   if (sheet.getLastRow() === 0) {
-    var header = FIXED.concat(WEEKS);
+    var header = FIXED.concat([MAJOR], WEEKS);
     sheet.getRange(1, 1, 1, header.length).setNumberFormat("@").setValues([header]).setFontWeight("bold");
+  } else if (fixedCount_(sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), FIXED.length + 1)).getDisplayValues()[0]) === FIXED.length) {
+    // A tab from before Major: insert it after Source. Each week's results move one column right with their header.
+    withLock_(function () {
+      sheet.insertColumnAfter(FIXED.length);
+      sheet.getRange(1, FIXED.length + 1).setNumberFormat("@").setValue(MAJOR).setFontWeight("bold");
+    });
   }
   // Text format keeps name, email and year literal: nothing typed into them is treated as a formula.
   sheet.getRange(1, 1, sheet.getMaxRows(), 3).setNumberFormat("@");
@@ -221,6 +230,15 @@ function join_(data) {
 
   var year = clean_(data.year);
   if (YEARS.indexOf(year) < 0) return { ok: false, field: "year", error: "Pick your class year." };
+  // Required since 2026-10-09. A page loaded before then sends no major at all; that sign-up is saved with it blank
+  // rather than failing on a field the old page cannot show.
+  var major = clean_(data.major);
+  if (data.major !== undefined) {
+    if (!major) return { ok: false, field: "major", error: "Enter your major. Undeclared is fine." };
+    if (major.length > 60 || !COMPANY_RE.test(major)) { // the same characters a company name allows
+      return { ok: false, field: "major", error: "Use letters, spaces and basic punctuation, up to 60 characters." };
+    }
+  }
 
   return withLock_(function () {
     var t = readTable_();
@@ -238,10 +256,13 @@ function join_(data) {
     if (i >= 0) {
       // The board added this person at a meeting; signing up fills in their details on the same row.
       t.sheet.getRange(t.players[i].row + 2, 2, 1, 2).setValues([[safe_(email), safe_(year)]]);
+      if (t.fixed > FIXED.length) t.sheet.getRange(t.players[i].row + 2, t.fixed).setValue(safe_(major));
       log_("join", t.players[i].name + " (claimed board-added row)", "sign-up form");
       return { ok: true, name: t.players[i].name };
     }
-    t.sheet.appendRow([safe_(n.value), safe_(email), safe_(year), new Date(), "form"]);
+    var row = [safe_(n.value), safe_(email), safe_(year), new Date(), "form"];
+    if (t.fixed > FIXED.length) row.push(safe_(major));
+    t.sheet.appendRow(row);
     clearNight_(); // someone joining at the meeting can log a minute later
     log_("join", n.value, "sign-up form");
     return { ok: true, name: n.value };
@@ -616,7 +637,7 @@ function saveWeek_(week, entries, startingStack, by) {
     if (w < 0) throw new Error("No week called " + clean_(week) + ".");
     if (!t.players.length) return { ok: true, saved: 0, cleared: 0, missing: [], week: t.weeks[w] };
 
-    var range = t.sheet.getRange(2, FIXED.length + w + 1, t.rowCount, 1);
+    var range = t.sheet.getRange(2, t.fixed + w + 1, t.rowCount, 1);
     var column = range.getValues();
     var names = t.players.map(function (p) { return p.name; });
     var saved = 0, cleared = 0, missing = [];
@@ -670,7 +691,7 @@ function review_(id, decision, counted, by) {
       return { ok: false, error: r.name + " already has a result for " + r.week + ". Reject this entry, or change the number in the table." };
     }
     var result = chips - (r.stack || STARTING_STACK);
-    t.sheet.getRange(t.players[p].row + 2, FIXED.length + w + 1).setValue(result);
+    t.sheet.getRange(t.players[p].row + 2, t.fixed + w + 1).setValue(result);
     s.sheet.getRange(r.row + 2, 7, 1, 7).setValues([[result, "approved"].concat(keep, [chips, safe_(by), new Date()])]);
     clearCache_();
     return { ok: true, decision: "approve", name: r.name, week: r.week, result: result,
@@ -711,7 +732,7 @@ function addWeek_(label) {
   return withLock_(function () {
     var t = readTable_();
     if (indexOfKey_(t.weeks, label) >= 0) return { ok: false, error: "There is already a week called " + label + "." };
-    t.sheet.getRange(1, FIXED.length + t.weeks.length + 1).setNumberFormat("@").setValue(safe_(label)).setFontWeight("bold");
+    t.sheet.getRange(1, t.fixed + t.weeks.length + 1).setNumberFormat("@").setValue(safe_(label)).setFontWeight("bold");
     clearCache_();
     clearNight_();
     log_("add week", label, "sheet menu");
@@ -779,10 +800,11 @@ function readTable_() {
   if (lastRow < 1) throw new Error("The ledger is not set up yet.");
 
   var header = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-  var weeks = header.slice(FIXED.length).map(clean_);
+  var fixed = fixedCount_(header);
+  var weeks = header.slice(fixed).map(clean_);
   while (weeks.length && !weeks[weeks.length - 1]) weeks.pop();
 
-  var rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, FIXED.length)).getValues() : [];
+  var rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, fixed)).getValues() : [];
   var players = [];
   rows.forEach(function (r, i) {
     var name = clean_(r[0]);
@@ -791,11 +813,14 @@ function readTable_() {
       row: i,
       name: name,
       email: clean_(r[1]),
-      results: weeks.map(function (_, w) { return num_(r[FIXED.length + w]); })
+      results: weeks.map(function (_, w) { return num_(r[fixed + w]); })
     });
   });
-  return { sheet: sheet, weeks: weeks, players: players, rowCount: rows.length };
+  return { sheet: sheet, weeks: weeks, players: players, rowCount: rows.length, fixed: fixed };
 }
+
+// How many columns come before the first week: FIXED, plus Major once Set up sheet has inserted it.
+function fixedCount_(header) { return key_(header[FIXED.length]) === key_(MAJOR) ? FIXED.length + 1 : FIXED.length; }
 
 // Starts with a letter or number; then letters, numbers, spaces, . ' (straight or curly) and hyphens.
 // Nothing that could start a spreadsheet formula or carry HTML.

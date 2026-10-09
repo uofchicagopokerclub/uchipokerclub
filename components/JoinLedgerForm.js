@@ -8,16 +8,16 @@ import SubmitButton from './SubmitButton';
 
 const YEARS = ledger.years;
 const DOMAIN = '@uchicago.edu';
-const EMPTY = { code: '', name: '', email: '', year: '', website: '' };
+const EMPTY = { code: '', name: '', email: '', year: '', major: '', website: '' };
 
-// Field names (code, name, email, year, website) are the Apps Script contract. Do not rename them.
+// Field names (code, name, email, year, major, website) are the Apps Script contract. Do not rename them.
 export default function JoinLedgerForm() {
   const [values, setValues] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [sending, setSending] = useState(false);
   const [joined, setJoined] = useState('');
-  const refs = { code: useRef(null), name: useRef(null), email: useRef(null), year: useRef(null) };
+  const refs = { code: useRef(null), name: useRef(null), email: useRef(null), year: useRef(null), major: useRef(null) };
 
   const set = (k) => (e) => setValues((v) => ({ ...v, [k]: e.target.value }));
 
@@ -35,6 +35,7 @@ export default function JoinLedgerForm() {
       name: values.name.replace(/\s+/g, ' ').trim(),
       email: values.email.trim().toLowerCase(),
       year: values.year,
+      major: values.major.replace(/\s+/g, ' ').trim(),
       website: values.website,
     };
     // Quick checks here; the server repeats them and has the final say.
@@ -43,6 +44,7 @@ export default function JoinLedgerForm() {
     if (!/^\S+@\S+\.\S+$/.test(v.email)) return fail('email', 'Enter a valid email address.');
     if (!v.email.endsWith(DOMAIN)) return fail('email', `Use your ${DOMAIN} email.`);
     if (!v.year) return fail('year', 'Pick your class year.');
+    if (!v.major) return fail('major', 'Enter your major. Undeclared is fine.');
 
     setSending(true);
     try {
@@ -106,6 +108,12 @@ export default function JoinLedgerForm() {
           {YEARS.map((y) => <option key={y}>{y}</option>)}
         </select>
         {errors.year && <span className="field-error">{errors.year}</span>}
+      </label>
+      <label className="field">
+        <span className="field-label">Major</span>
+        <input ref={refs.major} className="input" name="major" maxLength={60} autoComplete="off" value={values.major} onChange={set('major')} aria-invalid={invalid('major')} aria-describedby="major-help" />
+        <span className="field-help" id="major-help">Undeclared is fine.</span>
+        {errors.major && <span className="field-error">{errors.major}</span>}
       </label>
       <label className="trap" aria-hidden="true">
         Website

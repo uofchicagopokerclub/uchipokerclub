@@ -25,7 +25,7 @@ so commits never carry another account's email.
 2. Extensions > Apps Script. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo. Save.
 3. Reload the Sheet. A **Ledger** menu appears:
    - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries and
-     Submissions tabs. Safe to run again: it only adds what is missing, and puts back any mailing list row that
+     Submissions tabs, and inserts the Major column after Source in a Players tab made before 2026-10-09. Safe to run again: it only adds what is missing, and puts back any mailing list row that
      an older version wrote out of column order. The mailing list columns can be reordered freely: sign-ups are
      written by header name (Email, First Name, Last Name, Joined, Source, Class Year, Major). A header that is
      missing is added after the last column in use, by Set up sheet or by the next sign-up.
