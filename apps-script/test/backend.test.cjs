@@ -414,8 +414,8 @@ ok("a profit-or-loss save does not close logging", () => {
   admin("save", { week: "Oct 9", entries: [{ name: "Late", value: 300 }] }); // no stack, so 0 is stored
   eq(G.getAdminData_().startingStack, 0);
   const r = roster();
-  eq([r.ok, r.startingStack], [true, 7500]);
-  eq(submit({ name: "Late", chips: 7800 }).result, 300);
+  eq([r.ok, r.startingStack], [true, 250]);
+  eq(submit({ name: "Late", chips: 550 }).result, 300);
   setStack("10000");
 });
 ok("someone who joins at the meeting can log right away", () => {
@@ -458,9 +458,9 @@ ok("weeks added from the menu must be dates members can log on", () => {
   eq(get().weeks.slice(-1)[0], "Dec 4");
 });
 G.nightDate_ = realNight;
-ok("the board tool defaults to a 7,500 chip starting stack, and a saved 0 sticks", () => {
+ok("the board tool defaults to a 250 chip starting stack, and a saved 0 sticks", () => {
   setStack(null);
-  assert.strictEqual(G.getAdminData_().startingStack, 7500);
+  assert.strictEqual(G.getAdminData_().startingStack, 250);
   setStack("0");
   assert.strictEqual(G.getAdminData_().startingStack, 0);
   setStack("10000");
