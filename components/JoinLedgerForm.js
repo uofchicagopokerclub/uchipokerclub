@@ -70,9 +70,9 @@ export default function JoinLedgerForm() {
     return (
       <FormSuccess>
         <h2>{endSentence(`You\u2019re on the ledger, ${joined}`)}</h2>
-        <p>At the end of each meeting, log your chips. Your result counts once a board member approves it.</p>
+        <p>{ledger.counting}</p>
         <div className="actions" style={{ marginTop: 16 }}>
-          <Link className="btn btn-primary" href="/ledger/log">Log my result</Link>
+          <Link className="btn btn-primary" href="/ledger">View the ledger</Link>
           <button className="btn btn-secondary" type="button" onClick={again}>Sign up someone else</button>
         </div>
       </FormSuccess>

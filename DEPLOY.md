@@ -89,27 +89,27 @@ Defaults preset.
 
 ## Run a meeting
 
-1. Before it starts, open www.uchipokerclub.com/ledger/record on your phone (board password), set a new
-   **meeting code**, and show it in the room with the address uchipokerclub.com/ledger/log.
-2. New members join at /ledger/join with the same code. At the end, everyone logs their chips at /ledger/log.
-   Members log chip counts against the starting stack: 250 unless the board saved another number in the board
-   tool's Starting stack field (saved along with results). Before members log, check that field; to change it, type the stack and press Save.
-3. Each player shows you their stack. In the board tool's **To approve** list, type their name in the find box,
-   check the chips, correct **Chips counted** if needed, and press **Approve**. **Reject** if it is wrong; they can
-   log again. A card that says "Changed from" was logged more than once: make sure the person in front of you is
-   the one on the card. The public ledger updates within a minute.
-4. Walk-ins without a phone: type their name in the find box, enter their chips in the table, press Save. A result
-   typed in the table locks logging for that player that night, and Approve will not overwrite it.
-5. When the meeting ends, clear the meeting code (Change, empty, Save code), so last week's code cannot be used
-   before the next meeting.
+Members do not log their own chips (since 2026-10-16). Chips go in plastic bags at the end of the night and the
+board records every count. /ledger/log redirects to /ledger.
 
-Logging is open from 4 p.m. to 4 a.m. Chicago on the date in a week column's label ("Oct 9"). Ledger > Add a week
-only accepts labels like that. A meeting moved to another day needs its own week column, or the board table.
-Entries still waiting after the night stay in the board tool; it opens on that week until they are handled.
+1. Before it starts, open www.uchipokerclub.com/ledger/record on your phone (board password), set a new
+   **meeting code**, and show it in the room with the address uchipokerclub.com/ledger/join. New members join there
+   with the code; members only sign up once.
+2. Check the board tool's **Starting stack** field shows the stack handed out (250). To change it, type the stack
+   and press Save.
+3. At the end of the night, every player puts their chips in a plastic bag.
+4. Count each bag. In the board tool, type the player's name in the find box (tap **Add** if they are new), enter the
+   chips counted in the table, and press **Save**. The table check reads "balanced" once every stack is in; anything
+   else means a bag is missing or miscounted. The public ledger updates within a minute.
+5. When the meeting ends, clear the meeting code (Change, empty, Save code), so last week's code cannot be used
+   to join before the next meeting.
+
+Entries members logged before 2026-10-16 and never approved still show under **To approve** in the board tool, and
+it opens on their week after the meeting night until they are handled. The list disappears once nothing is waiting.
 
 Google is sometimes slow, up to about a minute for one answer. After a few seconds every form says "Still working".
 Members' forms stop waiting after a minute and keep what was typed; sending again is safe, because the backend
-recognizes a log or sign-up it already has. The board tool waits for every answer and handles one request at a time,
+recognizes a sign-up it already has. The board tool waits for every answer and handles one request at a time,
 so let it finish rather than refreshing the page.
 
 ## Everyday

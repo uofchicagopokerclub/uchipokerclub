@@ -174,7 +174,7 @@ export default function RecordResults() {
   }, [edits, netFor, shown]);
 
   const changes = useMemo(() => (data ? data.players.filter(isChanged) : []), [data, isChanged]);
-  // The stack members log against is saved with results, so it can also be saved on its own.
+  // The starting stack is saved with results, so it can also be saved on its own.
   const stackChanged = Boolean(data) && start !== (data.startingStack || 0);
 
   const stats = useMemo(() => {
@@ -284,7 +284,7 @@ export default function RecordResults() {
       const r = await board('setCode', { code: codeEdit });
       setData((d) => ({ ...d, meetingCode: r.code }));
       setCodeEdit(null);
-      setMsg({ text: r.code ? `The meeting code is now ${r.code}.` : 'Joining and logging are closed until you set a code.', kind: 'ok' });
+      setMsg({ text: r.code ? `The meeting code is now ${r.code}.` : 'Joining is closed until you set a code.', kind: 'ok' });
     } catch (err) {
       if (!err.auth) setMsg({ text: err.message, kind: 'err' });
     } finally {
@@ -366,7 +366,7 @@ export default function RecordResults() {
         <span className="field-label">Meeting code</span>
         {codeEdit === null ? (
           <p className="code-show">
-            <b>{data.meetingCode || 'None, so joining and logging are closed'}</b>
+            <b>{data.meetingCode || 'None, so joining is closed'}</b>
             <button className="link-btn" type="button" onClick={() => setCodeEdit(data.meetingCode || '')}>Change</button>
           </p>
         ) : (
@@ -379,7 +379,7 @@ export default function RecordResults() {
               <button className="btn btn-primary" type="submit" disabled={waiting}>Save code</button>
               <button className="btn btn-secondary" type="button" onClick={() => setCodeEdit(null)}>Cancel</button>
             </form>
-            <span className="field-help">Members need it to join and to log results. Set a new one at each meeting, and clear it when the meeting ends.</span>
+            <span className="field-help">Members need it to join the ledger. Set a new one at each meeting, and clear it when the meeting ends.</span>
           </>
         )}
       </div>}
@@ -426,7 +426,10 @@ export default function RecordResults() {
         )}
       </div>
 
-      <Approvals data={data} week={week} query={query} board={board} busy={waiting} onDecided={onDecided} reload={reload} onShowWeek={showWeek} />
+      {/* Members stopped logging their own chips on 2026-10-16; the list only appears for entries still waiting. */}
+      {data.submissions?.length > 0 && (
+        <Approvals data={data} week={week} query={query} board={board} busy={waiting} onDecided={onDecided} reload={reload} onShowWeek={showWeek} />
+      )}
 
       {!data.players.length ? (
         <p className="ledger-state">No players yet. People join through the sign-up form, or type a name above and press Add.</p>

@@ -4,10 +4,9 @@
 
 1. **UChicago students** deciding whether to come to a meeting. They need: when, where, whether beginners are
    welcome (yes), and how to join the mailing list.
-2. **Members** signing up for the ledger with the meeting code, logging their chips at each meeting
-   (`/ledger/log`), and checking the standings.
-3. **The board**, checking each member's chips and approving their result at `/ledger/record`, and entering
-   results for anyone who cannot log.
+2. **Members** signing up for the ledger once with the meeting code, and checking the standings. Since
+   2026-10-16 members do not log their own chips: chips go in plastic bags at the end of the night.
+3. **The board**, counting every bag and entering each member's chips at `/ledger/record`.
 4. **Recruiters and sponsors** from quant firms, who need a credible picture of the club and a way to ask for
    the sponsorship prospectus.
 

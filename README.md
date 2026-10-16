@@ -25,8 +25,8 @@ The Google Sheet is the database. Its Apps Script (`apps-script/Code.gs`) is a s
 |---|---|---|
 | `GET` | Anyone | Names and weekly results of people who have played. Never emails, never unapproved results. |
 | `POST join` | Anyone with the meeting code | Adds a member to the Players tab |
-| `POST roster` | Anyone with the meeting code, on a meeting day | Tonight's week and the list of names, for `/ledger/log` |
-| `POST submit` | Anyone with the meeting code, on a meeting day | Adds a pending row to the Submissions tab. Counts only once approved |
+| `POST roster` | Anyone with the meeting code, on a meeting day | Tonight's week and the list of names. Unused by the site since members stopped logging (2026-10-16) |
+| `POST submit` | Anyone with the meeting code, on a meeting day | Adds a pending row to the Submissions tab. Counts only once approved. Unused by the site since 2026-10-16 |
 | `POST subscribe` | Anyone | Adds a row to the Mailing list tab (footer form) |
 | `POST sponsor` | Anyone, capped per hour | Adds a row to the Sponsor inquiries tab (Contact page). Nothing is emailed |
 | `POST load`, `save`, `addPlayer`, `review`, `setCode` | Board password only | The board tool at `/ledger/record`: results, approvals, the meeting code |

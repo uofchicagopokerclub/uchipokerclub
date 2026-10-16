@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { club } from '../content/club';
 import { endSentence, nameKey, signed, tone, wholeChips } from '../lib/ledger';
 import { formatClock } from '../lib/schedule';
 
-const LOG_ADDRESS = `${club.siteUrl.replace(/^https?:\/\//, '')}/ledger/log`;
 const chipsText = (n) => Number(n).toLocaleString('en-US');
 
-// Results members logged with the meeting code, waiting for a board member to see the chips. Approve writes the
-// counted chips minus the stack the member logged against; reject writes nothing and the member can log again.
+// Results members logged with the meeting code before self-logging ended on 2026-10-16, waiting for a board member.
+// Approve writes the counted chips minus the stack the member logged against; reject writes nothing.
 // The board tool's find box filters these cards, so a board member types a name and approves. Decisions update the
 // tool's data in place (onDecided) instead of reloading everything after every tap.
 // busy: a board request is in flight (a table save, say), so decisions wait for it.
@@ -58,7 +56,7 @@ export default function Approvals({ data, week, query, board, busy, onDecided, r
       setNote({
         text: decision === 'approve'
           ? `Approved ${r.name}: ${signed(r.result)}.`
-          : `${endSentence(`Rejected ${r.name}`)} They can log again.`,
+          : endSentence(`Rejected ${r.name}`),
         kind: 'ok',
       });
     });
@@ -80,9 +78,7 @@ export default function Approvals({ data, week, query, board, busy, onDecided, r
       )}
       {!pending.length ? (
         <p className="approvals-empty">
-          {handled
-            ? `Everything logged for ${label} is handled.`
-            : `Nothing logged for ${label} yet. Members log at ${LOG_ADDRESS} with the meeting code.`}
+          {handled ? `Everything logged for ${label} is handled.` : `Nothing waiting for ${label}.`}
         </p>
       ) : !shown.length ? (
         <p className="approvals-empty">Nobody with that name is waiting.</p>

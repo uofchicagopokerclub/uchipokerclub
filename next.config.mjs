@@ -43,6 +43,8 @@ const nextConfig = {
       },
       // The old Squarespace sitemap listed the home page as /home.
       { source: '/home', destination: '/', permanent: true },
+      // Members no longer log their own chips (2026-10-16): chips go in a bag and the board counts them.
+      { source: '/ledger/log', destination: '/ledger', permanent: false },
     ];
   },
 
