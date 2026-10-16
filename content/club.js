@@ -27,7 +27,7 @@ export const ledger = {
   payouts: [400, 225, 150, 100, 75, 50],
   rowsBeforeShowAll: 25,
   prizeNote: 'The top 6 at the end of the term receive Visa gift cards.',
-  counting: 'At the end of each meeting, put your chips in a plastic bag. The board counts every bag and posts the results on the ledger.',
+  counting: 'At the end of each meeting, put your chips in a plastic bag and write the name you joined the ledger with on it. The board counts every bag and posts the results on the ledger.',
   explainer: 'Paper profit and loss. Stacks reset every week and the ledger carries over. No money is wagered at any point. Chips are for scoring only.',
 };
 
@@ -57,7 +57,7 @@ export const home = {
       text: 'A room full of people who want to get better at the same game. No experience needed to walk in.',
     },
   ],
-  ledgerText: 'Every member starts each meeting with 250 chips. At the end you put your chips in a plastic bag, the board counts every bag, and results add up across the term.',
+  ledgerText: 'Every member starts each meeting with 250 chips. At the end you put your chips in a plastic bag with your name on it, the board counts every bag, and results add up across the term.',
 };
 
 export const cohort = {
@@ -101,7 +101,7 @@ export const about = {
     },
     {
       title: 'Paper profit and loss',
-      text: 'At the end of the night you put your chips in a plastic bag, and the board counts every bag and posts the results on the ledger. Stacks reset every week, and results add up across the term.',
+      text: 'At the end of the night you put your chips in a plastic bag and write your name on it, and the board counts every bag and posts the results on the ledger. Stacks reset every week, and results add up across the term.',
     },
   ],
 };

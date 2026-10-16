@@ -97,7 +97,8 @@ board records every count. /ledger/log redirects to /ledger.
    with the code; members only sign up once.
 2. Check the board tool's **Starting stack** field shows the stack handed out (250). To change it, type the stack
    and press Save.
-3. At the end of the night, every player puts their chips in a plastic bag.
+3. At the end of the night, every player puts their chips in a plastic bag and writes on it the name they joined
+   the ledger with, so it matches the find box.
 4. Count each bag. In the board tool, type the player's name in the find box (tap **Add** if they are new), enter the
    chips counted in the table, and press **Save**. The table check reads "balanced" once every stack is in; anything
    else means a bag is missing or miscounted. The public ledger updates within a minute.
