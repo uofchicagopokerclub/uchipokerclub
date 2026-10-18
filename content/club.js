@@ -131,7 +131,7 @@ export const events = [
     points: [
       'An evening of food, networking, and competition with Susquehanna for a select group of UChicago students.',
       'Bid or Bluff is a fast-paced game of strategy, deduction, and nerve. Prizes include a Nintendo Switch 2.',
-      'Apply with your resume by October 13 through the link in the club email. Selected attendees get the details.',
+      'This event is invite-only. Selected attendees were notified by email.',
     ],
   },
   {
