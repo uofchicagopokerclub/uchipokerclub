@@ -111,7 +111,9 @@ export const schedule = {
   meetings: [
     { date: '2026-10-09', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-10-16', start: '18:00', end: '20:00', place: 'Reynolds Club, McCormick Tribune Lounge', what: 'Weekly meeting' },
-    { date: '2026-10-22', start: '18:30', end: '20:00', place: 'Ida Noyes Hall, Library and Lounge', what: 'Bid or Bluff with Susquehanna', event: true },
+    // Invite-only: the site shows "Invite-only" for time and place. The times only keep it in order and mark it over
+    // at the end of the day; the real time and room go to selected attendees.
+    { date: '2026-10-22', start: '00:00', end: '23:59', place: '', what: 'Bid or Bluff with Susquehanna', event: true, inviteOnly: true },
     { date: '2026-10-23', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-10-30', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-06', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },

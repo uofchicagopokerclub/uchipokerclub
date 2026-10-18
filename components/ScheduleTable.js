@@ -1,5 +1,5 @@
 import { schedule } from '../content/club';
-import { formatDay, formatTimeRange, isOver, nextMeeting } from '../lib/schedule';
+import { formatDay, isOver, meetingPlace, meetingTime, nextMeeting } from '../lib/schedule';
 import { useNow } from '../lib/useNow';
 
 export default function ScheduleTable({ now: serverNow }) {
@@ -28,8 +28,8 @@ export default function ScheduleTable({ now: serverNow }) {
                   {formatDay(m.date)}
                   {isNext && <span className="next-tag">Next</span>}
                 </td>
-                <td>{formatTimeRange(m.start, m.end)}</td>
-                <td>{m.place}</td>
+                <td>{meetingTime(m)}</td>
+                <td>{meetingPlace(m)}</td>
                 <td>{m.what}</td>
               </tr>
             );

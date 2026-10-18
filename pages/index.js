@@ -4,7 +4,7 @@ import LedgerTop5 from '../components/LedgerTop5';
 import { PrizeLine } from '../components/PrizePool';
 import { cohort, gallery, home, ledger, schedule, sponsors } from '../content/club';
 import { fetchStandings, ledgerApiUrl } from '../lib/api';
-import { chicagoNow, formatDay, formatTimeRange, nextMeeting } from '../lib/schedule';
+import { INVITE_ONLY, chicagoNow, formatDay, formatTimeRange, nextMeeting } from '../lib/schedule';
 import { useNow } from '../lib/useNow';
 
 const GALLERY_SLOTS = ['g-a', 'g-b', 'g-c', 'g-d', 'g-e', 'g-f', 'g-g', 'g-h'];
@@ -84,9 +84,13 @@ export default function Home({ feed, connected, now }) {
           <div>
             {next && (
               <p className="band-meta">
-                {formatTimeRange(next.start, next.end)}
-                <br />
-                {next.place}
+                {next.inviteOnly ? INVITE_ONLY : (
+                  <>
+                    {formatTimeRange(next.start, next.end)}
+                    <br />
+                    {next.place}
+                  </>
+                )}
               </p>
             )}
             <p className="band-note">{home.meetingNote}</p>
