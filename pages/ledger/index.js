@@ -3,7 +3,7 @@ import Seo from '../../components/Seo';
 import LedgerTable, { metaLine, useStandings } from '../../components/LedgerTable';
 import { PrizePanel } from '../../components/PrizePool';
 import { ledger } from '../../content/club';
-import { fetchStandings, ledgerApiUrl } from '../../lib/api';
+import { standingsProps } from '../../lib/api';
 
 export default function LedgerPage({ feed, connected }) {
   // One source for the headline and the table, including standings the browser had to fetch itself.
@@ -43,7 +43,7 @@ export default function LedgerPage({ feed, connected }) {
 
 export async function getStaticProps() {
   return {
-    props: { feed: await fetchStandings(), connected: Boolean(ledgerApiUrl()) },
+    props: await standingsProps(),
     revalidate: 60,
   };
 }

@@ -3,7 +3,7 @@ import Seo from '../components/Seo';
 import LedgerTop5 from '../components/LedgerTop5';
 import { PrizeLine } from '../components/PrizePool';
 import { cohort, gallery, home, ledger, schedule, sponsors } from '../content/club';
-import { fetchStandings, ledgerApiUrl } from '../lib/api';
+import { standingsProps } from '../lib/api';
 import { INVITE_ONLY, chicagoNow, formatDay, formatTimeRange, nextMeeting } from '../lib/schedule';
 import { useNow } from '../lib/useNow';
 
@@ -174,10 +174,11 @@ export default function Home({ feed, connected, now }) {
 }
 
 // Rebuilt in the background at most every 60 seconds, so the ledger and "next meeting" stay current
-// without a redeploy, and visitors never wait on the Google Sheet.
+// without a redeploy, and visitors never wait on the Google Sheet. While the Sheet cannot be reached the last
+// good page stays up, `now` included; useNow moves "next meeting" to the visitor's clock once the page loads.
 export async function getStaticProps() {
   return {
-    props: { feed: await fetchStandings(), connected: Boolean(ledgerApiUrl()), now: chicagoNow() },
+    props: { ...(await standingsProps()), now: chicagoNow() },
     revalidate: 60,
   };
 }

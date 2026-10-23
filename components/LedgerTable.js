@@ -6,8 +6,9 @@ import { computeStandings, money, searchKey, signed, tone } from '../lib/ledger'
 import { formatDay } from '../lib/schedule';
 import { SearchIcon } from './Icons';
 
-// Standings come pre-rendered from the server (refreshed every 60 seconds). If the server could not
-// reach the Sheet, the browser fetches them instead and shows placeholder rows meanwhile.
+// Standings come pre-rendered from the server (refreshed every 60 seconds; a failed refresh keeps the last good
+// page). If the build itself could not reach the Sheet, the browser fetches them instead and shows placeholder rows
+// meanwhile.
 export function useStandings(initialFeed, connected) {
   const [feed, setFeed] = useState(initialFeed);
   const [status, setStatus] = useState(initialFeed || !connected ? 'ready' : 'loading');
