@@ -13,13 +13,16 @@
      Copy the URL ending in /exec into ledger.apiUrl in content/club.js in the website repo, then commit.
   5. Share the Sheet only with board members who need it, never "Anyone with the link".
 
-  Every meeting: show the meeting code in the room. Members log their chips at www.uchipokerclub.com/ledger/log,
-  and a board member checks each stack and approves it at www.uchipokerclub.com/ledger/record (board password).
+  Every meeting: show the meeting code in the room. Members check in at www.uchipokerclub.com/ledger/checkin and show
+  the confirmation to get their chips. At the end every player bags their chips, the board enters each count at
+  www.uchipokerclub.com/ledger/record (board password), then records anyone checked in without a bag at 0 chips.
 
   Security model
-  - Public read: names and results of people who have played. Emails and unapproved results never leave the Sheet.
-  - Joining and logging a result need the meeting code (6+ characters). Anonymous traffic is capped per minute, so
-    guessing it is impractical. The list of names is shown only to someone with the code.
+  - Public read: names and results of people who have played. Emails, check-ins and unapproved results never leave
+    the Sheet.
+  - Joining, checking in and logging a result need the meeting code (6+ characters). Anonymous traffic is capped per
+    minute, so guessing it is impractical. The list of names is shown only to someone with the code. Checking in also
+    needs the email the member joined with, so nobody can check in a name they do not know the email for.
   - A logged result counts only after a board member approves it. Logging is open on meeting nights only (4 p.m. to
     4 a.m. Chicago, on the date a week column names), with one entry per member per night.
   - Recording, approving and changing the code need the board password: a generated 96-bit secret, stored only as a
@@ -40,6 +43,7 @@ var LOG_NAME = "Log";
 var LIST_NAME = "Mailing list";
 var SPONSOR_NAME = "Sponsor inquiries";
 var SUBMIT_NAME = "Submissions";
+var CHECKIN_NAME = "Check-ins";
 var TIME_ZONE = "America/Chicago"; // meeting days are Chicago dates
 // Shown to visitors when a form cannot take their details. This script never sends email.
 var CLUB_EMAIL = "UofChicagoPokerClub@gmail.com";
@@ -57,6 +61,7 @@ var MAX_SPONSOR_ROWS = 5000;  // sponsor inquiry rows
 var SPONSORS_PER_HOUR = 20;  // keeps a flood from burying the club inbox
 var MAX_SUBMISSIONS = 20000; // logged-result rows (one per member per night, so a term needs a few hundred)
 var MAX_LOGS_PER_NIGHT = 5;  // a member can fix a typo, not flood the board's list
+var MAX_CHECKINS = 20000;    // check-in rows (one per member per night)
 var NIGHT_OPENS = 16;        // logging opens at 4 p.m. Chicago on a meeting day...
 var NIGHT_CLOSES = 4;        // ...and closes at 4 a.m., for a meeting that runs late
 var STARTING_STACK = 250;    // chips each member starts a meeting with (Max, 2026-10-09; was 10,000, then 7,500)
@@ -100,6 +105,7 @@ function setupSheet() {
   sponsorSheet_();
   var submissions = submitSheet_();
   submissions.getRange(1, 3, submissions.getMaxRows(), 2).setNumberFormat("@"); // rows added since creation too
+  checkinSheet_();
   ss.toast("Ledger sheet is ready." + (repaired ? " Fixed the column order of " + repaired + " mailing list row" + (repaired === 1 ? "." : "s.") : ""), "Ledger");
 }
 
@@ -177,6 +183,7 @@ function doPost(e) {
     // action that checks the meeting code goes through here, which is what makes guessing the code impractical.
     var throttled = function (fn) { return json_(allow_("anon", ANON_PER_MINUTE, 60) ? fn(data) : busy); };
     if (action === "join") return throttled(join_);
+    if (action === "checkin") return throttled(checkin_);
     if (action === "roster") return throttled(roster_);
     if (action === "submit") return throttled(submit_);
     if (action === "subscribe") return throttled(subscribe_);
@@ -194,6 +201,8 @@ function doPost(e) {
     if (action === "addPlayer") return json_(addPlayer_(data.name, by));
     if (action === "review") return json_(review_(data.id, data.decision, data.chips, by));
     if (action === "setCode") return json_(setMeetingCode_(data.code, by));
+    if (action === "setCheckin") return json_(setCheckin_(data.week, data.name, data.on, by));
+    if (action === "noBags") return json_(noBags_(data.week, data.startingStack, data.names, by));
     return json_({ ok: false, error: "Unknown action." });
   } catch (err) {
     return json_({ ok: false, error: err && err.message ? err.message : "Something went wrong. Try again." });
@@ -240,8 +249,10 @@ function join_(data) {
     }
   }
 
-  return withLock_(function () {
+  var weeks = null;
+  var out = withLock_(function () {
     var t = readTable_();
+    weeks = t.weeks;
     if (t.players.length >= MAX_PLAYERS) return { ok: false, error: "Sign-ups are full. Ask a board member." };
     var same = t.players.filter(function (p) { return p.email && p.email.toLowerCase() === email; })[0];
     if (same) {
@@ -267,6 +278,105 @@ function join_(data) {
     log_("join", n.value, "sign-up form");
     return { ok: true, name: n.value };
   });
+
+  // Joining on a meeting night checks the new member in as well, so they show the same screen to get their chips.
+  // A check-in that fails (a busy lock) leaves the sign-up standing; the page then sends them to check in.
+  if (out.ok && out.name) {
+    var w = tonight_(weeks);
+    if (w >= 0) {
+      try {
+        var c = addCheckin_(weeks[w], out.name, "join", "");
+        if (c.ok) { out.checkedIn = c.week; out.at = c.at; }
+      } catch (err) {}
+    }
+  }
+  return out;
+}
+
+/* ---------- Check-in (meeting code, meeting nights only) ---------- */
+
+// Members check in when they take their starting stack and show the confirmation to the board member handing out
+// chips. At the end of the night the board records everyone checked in who handed in no bag at 0 chips (noBags_), so
+// leaving without a bag no longer hides a loss (Max, 2026-10-24). A member is found by the email they joined with,
+// which keeps anyone from checking in a name they do not know the email for.
+var CHECKIN_CLOSED = "Check-in is closed right now. Ask a board member.";
+var CHECKIN_NOT_TONIGHT = "Check-in opens at 4 p.m. on meeting nights.";
+
+function checkin_(data) {
+  var denied = checkCode_(data.code, CHECKIN_CLOSED);
+  if (denied) return denied;
+  var email = clean_(data.email).toLowerCase();
+  if (!email) return { ok: false, field: "email", error: "Enter the email you joined the ledger with." };
+  var t = readTable_(), w = tonight_(t.weeks);
+  if (w < 0) return { ok: false, error: CHECKIN_NOT_TONIGHT };
+  var p = t.players.filter(function (x) { return x.email && x.email.toLowerCase() === email; })[0];
+  if (!p) {
+    return { ok: false, field: "email", unknown: true,
+      error: "No one on the ledger uses that email. New here? Join the ledger: it checks you in too." };
+  }
+  return addCheckin_(t.weeks[w], p.name, "self", "");
+}
+
+// One row per player per week. Checking in again (a retry after a slow answer, or opening the screen again) changes
+// nothing and answers with the first time. A check-in the board removed comes back when the member or the board checks
+// in again, but not from a join sent again after a slow answer, which is not someone asking to be checked in.
+function addCheckin_(week, name, source, by) {
+  return withLock_(function () {
+    var c = readCheckins_(true), mine = findCheckin_(c.rows, week, name);
+    if (mine && mine.status === "in") return { ok: true, name: name, week: week, at: iso_(mine.at), again: true };
+    if (mine && source === "join") return { ok: false, error: "" };
+    var now = new Date();
+    if (mine) {
+      c.sheet.getRange(mine.row + 2, 3, 1, 6).setValues([[now, source, "in", safe_(by), now, ""]]);
+    } else {
+      if (c.rows.length >= MAX_CHECKINS) return { ok: false, error: "Check-in is full. Ask a board member." };
+      c.sheet.appendRow([safe_(week), safe_(name), now, source, "in", safe_(by), ""]);
+    }
+    return { ok: true, name: name, week: week, at: now.toISOString(), again: false };
+  });
+}
+
+// Columns: 1 Week, 2 Name, 3 Checked in, 4 Source (self, join or board), 5 Status (in or removed), 6 Changed by,
+// 7 Changed at, 8 No bag (the result noBags_ wrote, so taking the check-in back can take that result back too).
+var CHECKIN_HEADER = ["Week", "Name", "Checked in", "Source", "Status", "Changed by", "Changed at", "No bag"];
+
+function checkinSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHECKIN_NAME);
+  if (sheet) return sheet;
+  try {
+    sheet = ss.insertSheet(CHECKIN_NAME);
+  } catch (err) {
+    // Another request created it a moment ago.
+    sheet = ss.getSheetByName(CHECKIN_NAME);
+    if (!sheet) throw err;
+    return sheet;
+  }
+  sheet.getRange(1, 1, 1, CHECKIN_HEADER.length).setValues([CHECKIN_HEADER]).setFontWeight("bold");
+  sheet.getRange(1, 1, sheet.getMaxRows(), 2).setNumberFormat("@"); // week and name stay literal text
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+// create: false for read-only callers, which see no rows until the tab exists.
+function readCheckins_(create) {
+  var sheet = create ? checkinSheet_() : SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CHECKIN_NAME);
+  if (!sheet) return { sheet: null, rows: [] };
+  var n = sheet.getLastRow() - 1;
+  var values = n > 0 ? sheet.getRange(2, 1, n, CHECKIN_HEADER.length).getValues() : [];
+  return {
+    sheet: sheet,
+    rows: values.map(function (r, i) {
+      return { row: i, week: weekText_(r[0]), name: clean_(r[1]), at: r[2], source: clean_(r[3]), status: clean_(r[4]),
+        noBag: num_(r[7]) };
+    })
+  };
+}
+
+// The row for this player and week, or null.
+function findCheckin_(rows, week, name) {
+  for (var i = 0; i < rows.length; i++) if (key_(rows[i].week) === key_(week) && key_(rows[i].name) === key_(name)) return rows[i];
+  return null;
 }
 
 /* ---------- Members log their results (meeting code, meeting nights only) ---------- */
@@ -601,8 +711,88 @@ function getAdminData_() {
     meetingCode: prop_("JOIN_CODE") || "",
     players: t.players.map(function (p) { return { name: p.name, results: p.results }; }), // never emails
     submissions: subs.pending,
-    handled: subs.handled
+    handled: subs.handled,
+    checkins: boardCheckins_(t.weeks)
   };
+}
+
+// Who is checked in, per week: { "Oct 30": [{ name, at }] }. A problem with the tab never keeps the board out of
+// the tool.
+function boardCheckins_(weeks) {
+  var out = {};
+  try {
+    readCheckins_(false).rows.forEach(function (r) {
+      var w = indexOfKey_(weeks, r.week);
+      if (w < 0 || r.status !== "in") return;
+      (out[weeks[w]] = out[weeks[w]] || []).push({ name: r.name, at: iso_(r.at) });
+    });
+  } catch (err) {
+    return {};
+  }
+  return out;
+}
+
+// The board checks in someone without a phone (on: true), or takes back a check-in made by mistake (on: false).
+function setCheckin_(week, name, on, by) {
+  var t = readTable_();
+  var w = indexOfKey_(t.weeks, week);
+  if (w < 0) throw new Error("No week called " + clean_(week) + ".");
+  var i = indexOfKey_(t.players.map(function (p) { return p.name; }), name);
+  if (i < 0) return { ok: false, error: endSentence_(clean_(name).slice(0, 40) + " is no longer on the ledger") };
+  var label = t.weeks[w], player = t.players[i].name;
+  var done = on === true ? addCheckin_(label, player, "board", by) : withLock_(function () {
+    var c = readCheckins_(false), mine = findCheckin_(c.rows, label, player);
+    if (!mine || mine.status !== "in") return { ok: true, name: player, week: label, removed: false, cleared: false };
+    // A check-in made by mistake also takes back the 0-chip result it caused, unless the board has changed it since.
+    var fresh = readTable_(), p = indexOfKey_(fresh.players.map(function (x) { return x.name; }), player);
+    var cell = p >= 0 ? fresh.sheet.getRange(fresh.players[p].row + 2, fresh.fixed + w + 1) : null;
+    var cleared = Boolean(cell) && mine.noBag !== null && fresh.players[p].results[w] === mine.noBag;
+    if (cleared) { cell.setValue(""); clearCache_(); }
+    c.sheet.getRange(mine.row + 2, 5, 1, 4).setValues([["removed", safe_(by), new Date(), ""]]);
+    return { ok: true, name: player, week: label, removed: true, cleared: cleared };
+  });
+  if (done.ok && (on === true ? !done.again : done.removed)) {
+    log_(on === true ? "check in" : "check-in removed", label + ": " + player + (done.cleared ? ", 0-chip result cleared" : ""), by);
+  }
+  return done;
+}
+
+// End of the night: everyone checked in for the week who still has no result is recorded at 0 chips, so the stack
+// they took counts as lost. Without names it only lists them, for the board to look over; with names it records
+// those of them still checked in without a result. A result already saved is never overwritten.
+function noBags_(week, startingStack, names, by) {
+  var start = Number(startingStack) || 0;
+  if (!(start > 0 && start <= MAX_CHIPS)) throw new Error("Set the starting stack first, so a missing bag counts as losing it.");
+  var preview = !Array.isArray(names);
+  if (!preview && names.length > MAX_PLAYERS) throw new Error("Too many names.");
+
+  var done = withLock_(function () {
+    var t = readTable_();
+    var w = indexOfKey_(t.weeks, week);
+    if (w < 0) throw new Error("No week called " + clean_(week) + ".");
+    var label = t.weeks[w], checked = {}, c = readCheckins_(false);
+    c.rows.forEach(function (r) {
+      if (r.status === "in" && key_(r.week) === key_(label)) checked[key_(r.name)] = r;
+    });
+    var missing = t.players.filter(function (p) { return checked[key_(p.name)] && p.results[w] === null; });
+    if (preview) return { ok: true, week: label, names: missing.map(function (p) { return p.name; }), marked: 0 };
+
+    var want = {};
+    names.forEach(function (n) { if (typeof n === "string") want[key_(n)] = true; });
+    var mark = missing.filter(function (p) { return want[key_(p.name)]; });
+    if (mark.length) {
+      var range = t.sheet.getRange(2, t.fixed + w + 1, t.rowCount, 1), column = range.getValues();
+      mark.forEach(function (p) {
+        column[p.row][0] = -start;
+        c.sheet.getRange(checked[key_(p.name)].row + 2, 8).setValue(-start);
+      });
+      range.setValues(column);
+      clearCache_();
+    }
+    return { ok: true, week: label, names: mark.map(function (p) { return p.name; }), marked: mark.length };
+  });
+  if (done.marked) log_("no bag, 0 chips", done.week + ": " + done.names.join(", "), by);
+  return done;
 }
 
 // What the board tool needs from the Submissions tab: every entry still waiting this term (newest first), and how
@@ -895,6 +1085,8 @@ function setProp_(k, value) {
 }
 
 function clean_(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim(); }
+function iso_(v) { return isDate_(v) ? v.toISOString() : clean_(v); }
+function endSentence_(s) { return /[.!?]$/.test(s) ? s : s + "."; }
 function key_(s) { return clean_(s).toLowerCase(); }
 function indexOfKey_(list, s) {
   var k = key_(s);

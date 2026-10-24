@@ -60,6 +60,7 @@ function makeEnv() {
   ctx.__list = () => sheets["Mailing list"];
   ctx.__sponsors = () => sheets["Sponsor inquiries"];
   ctx.__submissions = () => sheets.Submissions;
+  ctx.__checkins = () => sheets["Check-ins"];
   ctx.__sent = [];
   ctx.__mailFails = false;
   ctx.__lockBusy = false; // true: every tryLock times out, as when a long queue is waiting for the lock

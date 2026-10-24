@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeStandings, parseChips, signed, cleanFeed, wholeChips } from '../lib/ledger.js';
+import { checkinsFor, computeStandings, parseChips, signed, cleanFeed, wholeChips } from '../lib/ledger.js';
 
 const feed = {
   term: 'Fall 2026',
@@ -73,4 +73,22 @@ test('signed uses a real minus and thousands separators', () => {
   assert.equal(signed(4200), '+4,200');
   assert.equal(signed(-1250), '−1,250');
   assert.equal(signed(0), '0');
+});
+
+test('check-ins for a week: who is in, and who has no bag counted yet', () => {
+  const data = {
+    weeks: ['Oct 23', 'Oct 30'],
+    players: [
+      { name: 'Ava', results: [null, 150] },
+      { name: 'Bo', results: [-250, null] },
+      { name: 'Cy', results: [100, null] },
+    ],
+    checkins: { 'Oct 30': [{ name: 'ava', at: '2026-10-30T23:04:00.000Z' }, { name: 'Bo', at: '2026-10-30T23:10:00.000Z' }] },
+  };
+  const c = checkinsFor(data, 1);
+  assert.equal(c.at.get('ava'), '2026-10-30T23:04:00.000Z');
+  assert.equal(c.at.has('cy'), false);
+  assert.deepEqual(c.noBag, ['Bo']);
+  assert.deepEqual(checkinsFor(data, 0).noBag, []);
+  assert.equal(checkinsFor({ ...data, checkins: undefined }, 1), null);
 });

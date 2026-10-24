@@ -24,8 +24,8 @@ so commits never carry another account's email.
 1. Signed in as UofChicagoPokerClub@gmail.com, create a Google Sheet named "UChicago Poker Club Ledger".
 2. Extensions > Apps Script. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo. Save.
 3. Reload the Sheet. A **Ledger** menu appears:
-   - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries and
-     Submissions tabs, and inserts the Major column after Source in a Players tab made before 2026-10-09. Safe to run again: it only adds what is missing, and puts back any mailing list row that
+   - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries,
+     Submissions and Check-ins tabs, and inserts the Major column after Source in a Players tab made before 2026-10-09. Safe to run again: it only adds what is missing, and puts back any mailing list row that
      an older version wrote out of column order. The mailing list columns can be reordered freely: sign-ups are
      written by header name (Email, First Name, Last Name, Joined, Source, Class Year, Major). A header that is
      missing is added after the last column in use, by Set up sheet or by the next sign-up.
@@ -89,29 +89,35 @@ Defaults preset.
 
 ## Run a meeting
 
-Members do not log their own chips (since 2026-10-16). Chips go in plastic bags at the end of the night and the
-board records every count. /ledger/log redirects to /ledger.
+Members check in for their chips (since 2026-10-30) and bag them at the end of the night; the board records every
+count. Anyone who checked in and hands in no bag is recorded at 0 chips. /ledger/log redirects to /ledger.
 
 1. Before it starts, open www.uchipokerclub.com/ledger/record on your phone (board password), set a new
-   **meeting code**, and show it in the room with the address uchipokerclub.com/ledger/join. New members join there
-   with the code; members only sign up once.
+   **meeting code**, and show it in the room with the address uchipokerclub.com/ledger/checkin.
 2. Check the board tool's **Starting stack** field shows the stack handed out (250). To change it, type the stack
    and press Save.
-3. At the end of the night, every player puts their chips in a plastic bag and writes on it the name they joined
+3. **Chips only for a check-in screen.** Members check in with the code and the email they joined with, and show the
+   confirmation (their name, "Checked in for" tonight). New members join at uchipokerclub.com/ledger/join, which checks
+   them in too. Someone without a phone: type their name in the board tool's find box and tap **Check in**.
+4. At the end of the night, every player puts their chips in a plastic bag and writes on it the name they joined
    the ledger with, so it matches the find box.
-4. Count each bag. In the board tool, type the player's name in the find box (tap **Add** if they are new), enter the
+5. Count each bag. In the board tool, type the player's name in the find box (tap **Add** if they are new), enter the
    chips counted in the table, and press **Save**. The table check reads "balanced" once every stack is in; anything
    else means a bag is missing or miscounted. The public ledger updates within a minute.
-5. When the meeting ends, clear the meeting code (Change, empty, Save code), so last week's code cannot be used
-   to join before the next meeting.
+6. **Once every bag is counted, tap Missing bags.** It lists everyone checked in with no result. Look it over: if
+   someone on it was not there, cancel, find them, and tap **Take back**. Then tap **Record ... at 0 chips**. A bag
+   counted in the meantime keeps its count. Taking back a check-in later also clears the 0-chip result it caused.
+7. When the meeting ends, clear the meeting code (Change, empty, Save code), so last week's code cannot be used
+   to join or check in before the next meeting.
 
 Entries members logged before 2026-10-16 and never approved still show under **To approve** in the board tool, and
 it opens on their week after the meeting night until they are handled. The list disappears once nothing is waiting.
 
 Google is sometimes slow, up to about a minute for one answer. After a few seconds every form says "Still working".
 Members' forms stop waiting after a minute and keep what was typed; sending again is safe, because the backend
-recognizes a sign-up it already has. The board tool waits for every answer and handles one request at a time,
-so let it finish rather than refreshing the page.
+recognizes a sign-up or a check-in it already has. The board tool waits for every answer and handles one request at
+a time, so let it finish rather than refreshing the page. Check-ins made on members' phones appear in the board tool
+when you tap **Refresh**.
 
 ## Everyday
 

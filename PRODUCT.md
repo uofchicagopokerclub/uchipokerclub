@@ -5,8 +5,11 @@
 1. **UChicago students** deciding whether to come to a meeting. They need: when, where, whether beginners are
    welcome (yes), and how to join the mailing list.
 2. **Members** signing up for the ledger once with the meeting code, and checking the standings. Since
-   2026-10-16 members do not log their own chips: chips go in plastic bags at the end of the night.
-3. **The board**, counting every bag and entering each member's chips at `/ledger/record`.
+   2026-10-16 members do not log their own chips: chips go in plastic bags at the end of the night. From
+   2026-10-30 they check in at `/ledger/checkin` to get their chips, and a checked-in member who hands in no bag is
+   recorded at 0 chips, because on 2026-10-23 about 18 stacks left the room without a bag.
+3. **The board**, counting every bag and entering each member's chips at `/ledger/record`, then recording the
+   missing bags.
 4. **Recruiters and sponsors** from quant firms, who need a credible picture of the club and a way to ask for
    the sponsorship prospectus.
 

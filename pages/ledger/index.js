@@ -27,6 +27,7 @@ export default function LedgerPage({ feed, connected }) {
             <p style={{ marginTop: 12 }}>{ledger.counting}</p>
             <div className="actions" style={{ marginTop: 20 }}>
               <Link className="btn btn-primary" href="/ledger/join">Join the ledger</Link>
+              <Link className="btn btn-secondary" href="/ledger/checkin">Check in</Link>
             </div>
           </div>
           <PrizePanel />

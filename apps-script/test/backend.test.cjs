@@ -457,6 +457,131 @@ ok("weeks added from the menu must be dates members can log on", () => {
   eq(G.addWeek_("Dec 4").ok, true);
   eq(get().weeks.slice(-1)[0], "Dec 4");
 });
+
+console.log(" check-in, and no bag counts as 0 chips");
+const checkin = (o) => post(Object.assign({ action: "checkin", code: CODE }, o));
+const checkinRows = (name) => G.__checkins().g.slice(1).filter((x) => x && (!name || x[1] === name));
+const oct30 = (name) => get().players.find((p) => p.name === name)?.results[3];
+night("2026-10-30");
+ok("check-in needs the meeting code, checked before anything else", () => {
+  eq(checkin({ code: "WRONG12", email: "nobody" }).field, "code");
+  admin("setCode", { code: "" });
+  assert.match(checkin({ email: "jamie@uchicago.edu" }).error, /Check-in is closed/);
+  admin("setCode", { code: CODE });
+});
+ok("check-in is open only on a meeting night that has a week column", () => {
+  night("");
+  assert.match(checkin({ email: "jamie@uchicago.edu" }).error, /4 p.m. on meeting nights/);
+  night("2026-10-31");
+  assert.match(checkin({ email: "jamie@uchicago.edu" }).error, /4 p.m. on meeting nights/);
+  night("2026-10-30");
+});
+ok("an email nobody joined with is refused and points to joining", () => {
+  const r = checkin({ email: "ghost@uchicago.edu" });
+  eq([r.ok, r.field, r.unknown], [false, "email", true]);
+  eq(checkin({ email: "" }).field, "email");
+});
+ok("a member checks in with the email they joined with, in any case", () => {
+  const r = checkin({ email: " JAMIE@uchicago.edu " });
+  eq([r.ok, r.name, r.week, r.again], [true, "Jamie K.", "Oct 30", false]);
+  assert.ok(!Number.isNaN(Date.parse(r.at)));
+  eq(checkinRows("Jamie K.").map((x) => [x[0], x[3], x[4]]), [["Oct 30", "self", "in"]]);
+});
+ok("checking in again adds nothing and answers with the first time", () => {
+  const first = checkinRows("Jamie K.")[0][2].toISOString();
+  const r = checkin({ email: "jamie@uchicago.edu" });
+  eq([r.ok, r.again, r.at], [true, true, first]);
+  eq(checkinRows("Jamie K.").length, 1);
+});
+ok("joining on a meeting night checks the new member in, once", () => {
+  const me = { name: "Fresh Joiner", email: "fresh@uchicago.edu", year: "2030", major: "Math" };
+  eq([join(me).checkedIn, join(me).checkedIn], ["Oct 30", "Oct 30"]);
+  eq(checkinRows("Fresh Joiner").map((x) => x[3]), ["join"]);
+});
+ok("joining on any other day does not check in", () => {
+  night("");
+  const r = join({ name: "Day Joiner", email: "day@uchicago.edu", year: "2029", major: "History" });
+  eq([r.ok, r.checkedIn], [true, undefined]);
+  eq(checkinRows("Day Joiner").length, 0);
+  night("2026-10-30");
+});
+ok("the board checks in a player with no email, and can take a check-in back", () => {
+  eq(admin("addPlayer", { name: "No Phone" }).ok, true);
+  const r = admin("setCheckin", { week: "oct 30", name: "no phone", on: true });
+  eq([r.ok, r.name, r.week], [true, "No Phone", "Oct 30"]);
+  eq(checkinRows("No Phone").map((x) => [x[3], x[5]]), [["board", "Max L."]]);
+  eq(admin("setCheckin", { week: "Oct 30", name: "Jamie K.", on: false }).removed, true);
+  eq(checkinRows("Jamie K.")[0][4], "removed");
+  eq(admin("load").data.checkins["Oct 30"].some((c) => c.name === "Jamie K."), false);
+  assert.ok(G.__log().g.some((x) => x && x[1] === "check-in removed" && x[2] === "Oct 30: Jamie K."));
+});
+ok("a member the board took back can check in again on the same row", () => {
+  eq(checkin({ email: "jamie@uchicago.edu" }).again, false);
+  eq(checkinRows("Jamie K.").map((x) => x[4]), ["in"]);
+});
+ok("bad board check-in requests are refused", () => {
+  assert.match(admin("setCheckin", { week: "Week 9", name: "Jamie K.", on: true }).error, /No week/);
+  assert.match(admin("setCheckin", { week: "Oct 30", name: "Nobody Here", on: true }).error, /no longer on the ledger/);
+  assert.ok(post({ action: "setCheckin", key: "nope", week: "Oct 30", name: "Jamie K.", on: false }).auth);
+  assert.ok(post({ action: "noBags", key: "nope", week: "Oct 30", startingStack: 250 }).auth);
+  eq(checkinRows("Jamie K.")[0][4], "in");
+});
+ok("the board tool gets check-ins by week, with no emails, and the public feed gets none", () => {
+  const d = admin("load").data;
+  eq(d.checkins["Oct 30"].map((c) => c.name).sort(), ["Fresh Joiner", "Jamie K.", "No Phone"]);
+  assert.ok(!JSON.stringify(d.checkins).includes("@"));
+  const feed = JSON.stringify(get());
+  assert.ok(!feed.includes("Fresh Joiner") && !feed.includes("checkin"));
+});
+ok("no bags: the list is everyone checked in with no result yet, and listing changes nothing", () => {
+  admin("save", { week: "Oct 30", entries: [{ name: "Jamie K.", value: 400 }], startingStack: 250 });
+  const r = admin("noBags", { week: "Oct 30", startingStack: 250 });
+  eq([r.ok, r.marked, r.names.sort()], [true, 0, ["Fresh Joiner", "No Phone"]]);
+  eq(oct30("Fresh Joiner"), undefined);
+});
+ok("no bags records 0 chips only for listed names still without a result, never overwriting a counted bag", () => {
+  // No Phone's bag turns up between the list and the confirm.
+  admin("save", { week: "Oct 30", entries: [{ name: "No Phone", value: 120 }], startingStack: 250 });
+  const r = admin("noBags", { week: "Oct 30", startingStack: 250, names: ["fresh joiner", "No Phone", "Jamie K.", "Day Joiner"] });
+  eq([r.marked, r.names], [1, ["Fresh Joiner"]]);
+  eq([oct30("Fresh Joiner"), oct30("No Phone"), oct30("Jamie K."), oct30("Day Joiner")], [-250, -130, 150, undefined]);
+  assert.ok(G.__log().g.some((x) => x && x[1] === "no bag, 0 chips" && x[2] === "Oct 30: Fresh Joiner" && x[3] === "Max L."));
+  eq(admin("noBags", { week: "Oct 30", startingStack: 250 }).names, []);
+});
+ok("no bags needs a starting stack and a real week", () => {
+  assert.match(admin("noBags", { week: "Oct 30", startingStack: 0 }).error, /starting stack/);
+  assert.match(admin("noBags", { week: "Oct 30" }).error, /starting stack/);
+  assert.match(admin("noBags", { week: "Week 9", startingStack: 250 }).error, /No week/);
+});
+ok("set up adds the Check-ins tab with headers, and running it again is safe", () => {
+  G.setupSheet();
+  G.setupSheet();
+  eq(G.__checkins().g[0], ["Week", "Name", "Checked in", "Source", "Status", "Changed by", "Changed at", "No bag"]);
+});
+ok("taking back a check-in also takes back the 0-chip result it caused, but not one the board changed", () => {
+  eq(admin("setCheckin", { week: "Oct 30", name: "Fresh Joiner", on: false }).cleared, true);
+  eq(oct30("Fresh Joiner"), undefined);
+  assert.ok(G.__log().g.some((x) => x && x[2] === "Oct 30: Fresh Joiner, 0-chip result cleared"));
+  checkin({ email: "day@uchicago.edu" });
+  admin("noBags", { week: "Oct 30", startingStack: 250, names: ["Day Joiner"] });
+  admin("save", { week: "Oct 30", entries: [{ name: "Day Joiner", value: 30 }], startingStack: 250 });
+  eq(admin("setCheckin", { week: "Oct 30", name: "Day Joiner", on: false }).cleared, false);
+  eq(oct30("Day Joiner"), -220);
+});
+ok("a join sent again does not bring back a check-in the board took back", () => {
+  const me = { name: "Fresh Joiner", email: "fresh@uchicago.edu", year: "2030", major: "Math" };
+  const r = join(me);
+  eq([r.ok, r.checkedIn], [true, undefined]);
+  eq(checkinRows("Fresh Joiner")[0][4], "removed");
+});
+ok("a join still succeeds when its check-in fails", () => {
+  const real = G.addCheckin_;
+  G.addCheckin_ = () => { throw new Error(G.BUSY); };
+  const r = join({ name: "Busy Night", email: "busy@uchicago.edu", year: "2028", major: "Math" });
+  G.addCheckin_ = real;
+  eq([r.ok, r.name, r.checkedIn], [true, "Busy Night", undefined]);
+  eq(checkin({ email: "busy@uchicago.edu" }).name, "Busy Night");
+});
 G.nightDate_ = realNight;
 ok("the board tool defaults to a 250 chip starting stack, and a saved 0 sticks", () => {
   setStack(null);

@@ -27,7 +27,15 @@ export const ledger = {
   payouts: [400, 225, 150, 100, 75, 50],
   rowsBeforeShowAll: 25,
   prizeNote: 'The top 6 at the end of the term receive Visa gift cards.',
-  counting: 'At the end of each meeting, put your chips in a plastic bag and write the name you joined the ledger with on it. The board counts every bag and posts the results on the ledger.',
+  counting: 'Check in at uchipokerclub.com/ledger/checkin when you get your chips. At the end of the meeting, put your chips in a plastic bag and write the name you joined the ledger with on it. The board counts every bag and posts the results on the ledger. If you check in and hand in no bag, you are recorded at 0 chips.',
+  // Members check in for their chips (since 2026-10-30), so leaving without a bag no longer hides a loss.
+  checkinNote: 'Show this screen to a board member to get your chips. At the end of the night, put your chips in a plastic bag with your name on it. If you hand in no bag, you are recorded at 0 chips.',
+  checkinSteps: [
+    'Check in with the meeting code and the email you joined the ledger with.',
+    'Show the confirmation to a board member to get your 250 chips.',
+    'At the end of the night, put your chips in a plastic bag with your name on it.',
+    'If you checked in and hand in no bag, you are recorded at 0 chips, which counts as losing your stack.',
+  ],
   explainer: 'Paper profit and loss. Stacks reset every week and the ledger carries over. No money is wagered at any point. Chips are for scoring only.',
 };
 
@@ -57,7 +65,7 @@ export const home = {
       text: 'A room full of people who want to get better at the same game. No experience needed to walk in.',
     },
   ],
-  ledgerText: 'Every member starts each meeting with 250 chips. At the end you put your chips in a plastic bag with your name on it, the board counts every bag, and results add up across the term.',
+  ledgerText: 'Every member checks in and starts each meeting with 250 chips. At the end you put your chips in a plastic bag with your name on it, the board counts every bag, and results add up across the term. No bag counts as 0 chips.',
 };
 
 export const cohort = {
@@ -101,7 +109,7 @@ export const about = {
     },
     {
       title: 'Paper profit and loss',
-      text: 'At the end of the night you put your chips in a plastic bag and write your name on it, and the board counts every bag and posts the results on the ledger. Stacks reset every week, and results add up across the term.',
+      text: 'You check in when you get your chips. At the end of the night you put your chips in a plastic bag and write your name on it, and the board counts every bag and posts the results on the ledger. If you checked in and hand in no bag, you are recorded at 0 chips. Stacks reset every week, and results add up across the term.',
     },
   ],
 };

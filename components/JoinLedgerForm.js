@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { ledger } from '../content/club';
 import { postToLedger } from '../lib/api';
 import { endSentence } from '../lib/ledger';
+import { formatClock } from '../lib/schedule';
 import FormSuccess from './FormSuccess';
 import SubmitButton from './SubmitButton';
 
@@ -16,7 +17,8 @@ export default function JoinLedgerForm() {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [sending, setSending] = useState(false);
-  const [joined, setJoined] = useState('');
+  // { name, week, at }. Joining on a meeting night checks the member in too; week and at are set only then.
+  const [joined, setJoined] = useState(null);
   const refs = { code: useRef(null), name: useRef(null), email: useRef(null), year: useRef(null), major: useRef(null) };
 
   const set = (k) => (e) => setValues((v) => ({ ...v, [k]: e.target.value }));
@@ -49,7 +51,7 @@ export default function JoinLedgerForm() {
     setSending(true);
     try {
       const res = await postToLedger({ action: 'join', ...v });
-      if (res.ok) setJoined(res.name || v.name);
+      if (res.ok) setJoined({ name: res.name || v.name, week: res.checkedIn || '', at: res.at || '' });
       else if (res.field) fail(res.field, res.error);
       else setFormError(res.error || 'Something went wrong. Try again.');
     } catch (err) {
@@ -62,15 +64,17 @@ export default function JoinLedgerForm() {
   function again() {
     // Keep the code filled in for the next person at a sign-up table.
     setValues((v) => ({ ...EMPTY, code: v.code }));
-    setJoined('');
+    setJoined(null);
     setTimeout(() => refs.name.current?.focus(), 0);
   }
 
   if (joined) {
+    const time = formatClock(joined.at);
     return (
       <FormSuccess>
-        <h2>{endSentence(`You\u2019re on the ledger, ${joined}`)}</h2>
-        <p>{ledger.counting}</p>
+        {joined.week && <p className="checkin-when">Checked in for {joined.week}{time ? ` at ${time}` : ''}</p>}
+        <h2>{endSentence(`You\u2019re on the ledger, ${joined.name}`)}</h2>
+        <p>{joined.week ? ledger.checkinNote : ledger.counting}</p>
         <div className="actions" style={{ marginTop: 16 }}>
           <Link className="btn btn-primary" href="/ledger">View the ledger</Link>
           <button className="btn btn-secondary" type="button" onClick={again}>Sign up someone else</button>

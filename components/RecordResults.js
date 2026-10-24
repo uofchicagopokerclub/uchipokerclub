@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { postToLedger } from '../lib/api';
-import { endSentence, nameKey, parseChips, signed, tone } from '../lib/ledger';
+import { checkinsFor, endSentence, nameKey, parseChips, signed, tone } from '../lib/ledger';
+import { formatClock } from '../lib/schedule';
 import Approvals from './Approvals';
 import StillWorking from './StillWorking';
 import SubmitButton from './SubmitButton';
@@ -53,6 +54,7 @@ export default function RecordResults() {
   // One board request at a time: a decision and a table save racing each other could overwrite one another.
   const waiting = busy || pending > 0;
   const [codeEdit, setCodeEdit] = useState(null); // the meeting code being typed, or null when not editing
+  const [noBagList, setNoBagList] = useState(null); // names the backend listed as checked in with no bag, or null
   const tableRef = useRef(null);
   const findRef = useRef(null);
   const focusFirst = useRef(false);
@@ -292,6 +294,86 @@ export default function RecordResults() {
     }
   }
 
+  // The board checks in someone without a phone, or takes back a check-in made by mistake.
+  async function setCheckin(p, on) {
+    if (waiting) return;
+    setBusy(true);
+    try {
+      const r = await board('setCheckin', { week: data.weeks[week], name: p.name, on });
+      if (r.cleared) {
+        // Taking it back also cleared the 0-chip result the missing-bags step had recorded, so fetch the table again.
+        await load({ keepWeek: week, keepEdits: true });
+      } else {
+        setData((d) => {
+          const list = ((d.checkins || {})[r.week] || []).filter((c) => nameKey(c.name) !== nameKey(r.name));
+          return { ...d, checkins: { ...d.checkins, [r.week]: on ? [...list, { name: r.name, at: r.at }] : list } };
+        });
+      }
+      setMsg({
+        text: on ? endSentence(`Checked in ${r.name}`)
+          : `Took back the check-in for ${r.name}${r.cleared ? ' and cleared their 0-chip result' : ''}.`,
+        kind: 'ok',
+      });
+    } catch (err) {
+      if (!err.auth) setMsg({ text: err.message, kind: 'err' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Members check in on their own phones, so the board tool fetches again to see who has come in since.
+  async function refresh() {
+    if (waiting) return;
+    setBusy(true);
+    try {
+      await reload();
+    } catch (err) {
+      if (!err.auth) setMsg({ text: err.message, kind: 'err' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // End of the night, step one: the backend lists everyone checked in who still has no result, for the board to
+  // look over before anything is written.
+  async function listNoBags() {
+    if (waiting) return;
+    if (changes.length) { setMsg({ text: 'Save or discard your changes first.', kind: 'err' }); return; }
+    if (!start) { setMsg({ text: 'Set the starting stack first, so a missing bag counts as losing it.', kind: 'err' }); return; }
+    setBusy(true);
+    setMsg({ text: '', kind: '' });
+    try {
+      const r = await board('noBags', { week: data.weeks[week], startingStack: start });
+      setNoBagList(r.names);
+    } catch (err) {
+      if (!err.auth) setMsg({ text: err.message, kind: 'err' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Step two: record that list at 0 chips. The backend skips anyone whose bag was counted in the meantime.
+  async function recordNoBags() {
+    if (waiting || !noBagList) return;
+    setBusy(true);
+    try {
+      const r = await board('noBags', { week: data.weeks[week], startingStack: start, names: noBagList });
+      await load({ keepWeek: week, keepEdits: true });
+      setNoBagList(null);
+      setMsg({
+        text: r.marked ? `Recorded ${r.marked} at 0 chips for ${r.week}.` : 'Nothing recorded: every bag on the list has been counted since.',
+        kind: 'ok',
+      });
+    } catch (err) {
+      if (!err.auth) setMsg({ text: err.message, kind: 'err' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // A stable ref, so the list scrolls into view once when it opens, not on every render.
+  const revealPanel = useCallback((el) => { el?.scrollIntoView({ block: 'nearest' }); }, []);
+
   function showWeek(i) {
     if (changes.length) {
       setMsg({ text: `Save or discard your changes to ${data.weeks[week]} first.`, kind: 'err' });
@@ -299,6 +381,7 @@ export default function RecordResults() {
     }
     setWeek(i);
     setEdits(new Map());
+    setNoBagList(null);
     setMsg({ text: '', kind: '' });
   }
 
@@ -345,6 +428,12 @@ export default function RecordResults() {
   const net = Math.round(stats.net);
   const seen = new Set();
   const dupes = [...new Set(data.players.map((p) => nameKey(p.name)).filter((k) => (seen.has(k) ? true : (seen.add(k), false))))];
+  const label = data.weeks[week];
+  const ci = checkinsFor(data, week); // null from a backend older than check-in, which hides all of it
+  const checkedAt = (p) => ci?.at.get(nameKey(p.name));
+  const at = (iso) => { const t = formatClock(iso); return t ? ` at ${t}` : ''; };
+  // The one player the find box points at, so the board can check them in or take it back.
+  const one = ci && q ? (data.players.find((p) => nameKey(p.name) === q) || (list.length === 1 ? list[0] : null)) : null;
 
   return (
     <div className="board-tool">
@@ -425,6 +514,14 @@ export default function RecordResults() {
           <button className="btn btn-primary" type="button" onClick={addPlayer} disabled={waiting}>Add &ldquo;{query.trim()}&rdquo;</button>
         )}
       </div>
+      {one && (
+        <p className="find-ci">
+          {checkedAt(one) ? `${one.name} checked in${at(checkedAt(one))}.` : `${one.name} is not checked in for ${label}.`}
+          <button className="link-btn" type="button" onClick={() => setCheckin(one, !checkedAt(one))} disabled={waiting}>
+            {checkedAt(one) ? 'Take back' : 'Check in'}
+          </button>
+        </p>
+      )}
 
       {/* Members stopped logging their own chips on 2026-10-16; the list only appears for entries still waiting. */}
       {data.submissions?.length > 0 && (
@@ -448,7 +545,11 @@ export default function RecordResults() {
                 const changed = isChanged(p);
                 return (
                   <tr key={`${p.name}#${i}`} className={[changed ? 'changed' : '', n.bad ? 'bad' : ''].join(' ').trim() || undefined}>
-                    <td className="nm">{p.name}</td>
+                    <td className="nm">
+                      {p.name}
+                      {/* Short enough to stay on one line beside the chip box on a phone. */}
+                      {checkedAt(p) && <span className="ci">{at(checkedAt(p)) ? `In${at(checkedAt(p))}` : 'Checked in'}</span>}
+                    </td>
                     <td className="in">
                       {/* The iPhone number pad has no minus key, so profit or loss entries, which can be negative, get the full keyboard. */}
                       <input
@@ -468,6 +569,33 @@ export default function RecordResults() {
         </div>
       )}
 
+      {noBagList && (
+        <div className="nobag" ref={revealPanel}>
+          {noBagList.length ? (
+            <>
+              <h2>No bag from {noBagList.length} checked in for {label}</h2>
+              <p>
+                Do this once every bag has been counted. Recording them at 0 chips gives each {signed(-start)}. A bag
+                counted after this list was made keeps its count. If someone here was not at the meeting, cancel, find
+                them, and tap Take back.
+              </p>
+              <ul className="nobag-names">{noBagList.map((n) => <li key={n}>{n}</li>)}</ul>
+              <div className="actions">
+                <button className="btn btn-primary" type="button" onClick={recordNoBags} disabled={waiting}>Record {noBagList.length} at 0 chips</button>
+                <button className="btn btn-secondary" type="button" onClick={() => setNoBagList(null)} disabled={waiting}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>Everyone checked in for {label} has a result. Nothing to record.</p>
+              <div className="actions">
+                <button className="btn btn-secondary" type="button" onClick={() => setNoBagList(null)}>Close</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="rec-foot">
         <p className="rec-stats">
           <b>{stats.played}</b> {stats.played === 1 ? 'player' : 'players'} this week
@@ -479,11 +607,21 @@ export default function RecordResults() {
               </span>
             </>
           )}
+          {ci && (ci.at.size > 0 || label === data.tonight) && (
+            <>
+              {'. '}<b>{ci.at.size}</b> checked in
+              {ci.noBag.length > 0 && <>, <b>{ci.noBag.length}</b> with no bag yet</>}
+              <button className="link-btn" type="button" onClick={refresh} disabled={waiting}>Refresh</button>
+            </>
+          )}
           {changes.length > 0 && <>{'. '}<b>{changes.length}</b> unsaved</>}
         </p>
         {msg.text && <span className={msg.kind === 'ok' ? 'msg-ok' : 'msg-err'} role="status">{msg.text}</span>}
         {changes.length > 0 && (
           <button className="btn btn-secondary" type="button" onClick={() => { setEdits(new Map()); setMsg({ text: 'Changes discarded.', kind: 'ok' }); }}>Discard</button>
+        )}
+        {ci && ci.noBag.length > 0 && !changes.length && !noBagList && (
+          <button className="btn btn-secondary" type="button" onClick={listNoBags} disabled={waiting}>Missing bags: {ci.noBag.length}</button>
         )}
         <button className="btn btn-primary" type="button" onClick={save} disabled={waiting || (!changes.length && !stackChanged) || stats.bad}>
           {changes.length ? `Save ${changes.length}` : 'Save'}
