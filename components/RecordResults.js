@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { postToLedger } from '../lib/api';
 import { checkinsFor, endSentence, historyFor, nameKey, parseChips, resultText, signed, tone } from '../lib/ledger';
 import { formatClock } from '../lib/schedule';
-import Approvals from './Approvals';
 import StillWorking from './StillWorking';
 import SubmitButton from './SubmitButton';
 
@@ -116,29 +115,8 @@ export default function RecordResults() {
     setPhase('ready');
   }, [board]);
 
-  // Refresh for the approvals list: whatever week is on screen, with unsaved table edits kept.
+  // Fetch again for whatever week is on screen, with unsaved table edits kept.
   const reload = useCallback(() => load({ keepWeek: weekRef.current, keepEdits: true }), [load]);
-
-  // A decision from the approvals list, applied to the data in place.
-  const onDecided = useCallback(({ id, decision, name, week: label, result }) => {
-    setData((d) => {
-      const w = d.weeks.findIndex((x) => nameKey(x) === nameKey(label));
-      const players = decision === 'approve' && w >= 0
-        ? d.players.map((p) => (nameKey(p.name) === nameKey(name) ? { ...p, results: p.results.map((v, i) => (i === w ? result : v)) } : p))
-        : d.players;
-      const handled = { ...(d.handled || {}), [label]: ((d.handled || {})[label] || 0) + 1 };
-      return { ...d, players, handled, submissions: d.submissions.filter((s) => s.id !== id) };
-    });
-    // An unsaved table edit for the same player would overwrite the approved result on the next Save.
-    if (decision === 'approve') {
-      setEdits((m) => {
-        if (!m.has(nameKey(name))) return m;
-        const next = new Map(m);
-        next.delete(nameKey(name));
-        return next;
-      });
-    }
-  }, []);
 
   useEffect(() => {
     try { if (localStorage.getItem(STORE_MODE) === 'checkin') setMode('checkin'); } catch {}
@@ -639,10 +617,6 @@ export default function RecordResults() {
         </div>
       )}
 
-      {/* Members stopped logging their own chips on 2026-10-16; the list only appears for entries still waiting. */}
-      {data.submissions?.length > 0 && (
-        <Approvals data={data} week={week} query={query} board={board} busy={waiting} onDecided={onDecided} reload={reload} onShowWeek={showWeek} />
-      )}
 
       {!data.players.length ? (
         <p className="ledger-state">No players yet. People join through the sign-up form, or type a name above and press Add.</p>

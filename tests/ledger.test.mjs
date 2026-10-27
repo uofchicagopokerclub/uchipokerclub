@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkinsFor, computeStandings, historyFor, parseChips, resultText, signed, cleanFeed, wholeChips } from '../lib/ledger.js';
+import { checkinsFor, computeStandings, historyFor, parseChips, resultText, signed, cleanFeed } from '../lib/ledger.js';
 
 const feed = {
   term: 'Fall 2026',
@@ -62,12 +62,6 @@ test('parseChips reads what people type', () => {
   assert.equal(parseChips(''), null);
 });
 
-test('wholeChips takes whole stacks from 0 to the cap, nothing else', () => {
-  assert.equal(wholeChips('12,500'), 12500);
-  assert.equal(wholeChips('0'), 0);
-  assert.equal(wholeChips('10000000'), 10000000);
-  for (const bad of ['-1', '12.5', '10000001', 'abc', '', null, '(300)']) assert.equal(wholeChips(bad), null, bad);
-});
 
 test('signed uses a real minus and thousands separators', () => {
   assert.equal(signed(4200), '+4,200');

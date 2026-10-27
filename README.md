@@ -23,18 +23,17 @@ The Google Sheet is the database. Its Apps Script (`apps-script/Code.gs`) is a s
 
 | Request | Who | What |
 |---|---|---|
-| `GET` | Anyone | Names and weekly results of people who have played. Never emails, never unapproved results. |
+| `GET` | Anyone | Names and weekly results of people who have played. Never emails or check-ins. |
 | `POST join` | Anyone with the meeting code | Adds a member to the Players tab. On a meeting night it also checks them in |
 | `POST checkin` | Anyone with the meeting code and a member's email, on a meeting night | Adds a row to the Check-ins tab for tonight's week. Sending it again changes nothing |
-| `POST roster` | Anyone with the meeting code, on a meeting day | Tonight's week and the list of names. Unused by the site since members stopped logging (2026-10-16) |
-| `POST submit` | Anyone with the meeting code, on a meeting day | Adds a pending row to the Submissions tab. Counts only once approved. Unused by the site since 2026-10-16 |
 | `POST subscribe` | Anyone | Adds a row to the Mailing list tab (footer form) |
 | `POST sponsor` | Anyone, capped per hour | Adds a row to the Sponsor inquiries tab (Contact page). Nothing is emailed |
-| `POST load`, `save`, `addPlayer`, `review`, `setCode` | Board password only | The board tool at `/ledger/record`: results, approvals, the meeting code |
+| `POST load`, `save`, `addPlayer`, `setCode` | Board password only | The board tool at `/ledger/record`: results, players, the meeting code |
 | `POST setCheckin`, `noBags` | Board password only | Check someone in or take it back; list, then record at 0 chips, everyone checked in with no result |
 
-A meeting day is the date in a week column's label ("Oct 9") in the term's year, Chicago time. Approving writes
-the result into the Players tab exactly as Save does, so standings and attendance only ever come from there.
+A meeting day is the date in a week column's label ("Oct 9") in the term's year, Chicago time. Results live only in
+the Players tab, so standings and attendance only ever come from there. The Submissions tab is a record of the one
+night members logged their own chips (Oct 9); nothing reads or writes it since 2026-10-27.
 
 The home page and `/ledger` are rebuilt in the background at most every 60 seconds, so standings update without
 a redeploy and visitors never wait on Google. If the Sheet is unreachable, the page falls back to fetching in

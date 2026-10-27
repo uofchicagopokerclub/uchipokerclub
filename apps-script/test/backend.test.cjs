@@ -284,15 +284,11 @@ ok("sponsor inquiries are capped per hour", () => {
   assert.ok(capped > 0);
 });
 ok("sponsor details never appear in the public feed", () => assert.ok(!JSON.stringify(get()).includes("deshaw")));
-console.log(" members log results, the board approves");
+console.log(" meeting nights and the board tool");
 const realNight = G.nightDate_;
 const night = (d) => { G.nightDate_ = () => d; };
 // Settings are cached, so a test that writes one behind the script's back clears its cache entry too.
 const setStack = (v) => { if (v === null) G.__props.delete("startingStack"); else G.__props.set("startingStack", v); G.__cache.delete("prop:startingStack"); };
-const roster = (o) => post(Object.assign({ action: "roster", code: CODE }, o));
-const submit = (o) => post(Object.assign({ action: "submit", code: CODE }, o));
-const pendingFor = (name) => admin("load").data.submissions.find((s) => s.name === name);
-const subRow = (name, status) => G.__submissions().g.slice(1).find((x) => x && x[3] === name && (!status || x[7] === status));
 ok("a meeting night runs 4 p.m. to 4 a.m. Chicago", () => {
   eq([realNight(new Date("2026-10-09T23:30:00Z")), realNight(new Date("2026-10-10T06:30:00Z")), realNight(new Date("2026-10-09T15:00:00Z"))],
     ["2026-10-09", "2026-10-09", ""]);
@@ -303,156 +299,61 @@ ok("week labels map to dates in the term's year, for every month", () => {
   const labels = ["Jan 1", "Feb 2", "Mar 3", "Apr 4", "May 5", "Jun 6", "Jul 7", "Aug 8", "Sep 9", "Oct 10", "Nov 11", "Dec 12"];
   eq(labels.map((l) => G.weekDate_(l)), labels.map((l, i) => `2026-${String(i + 1).padStart(2, "0")}-${l.split(" ")[1].padStart(2, "0")}`));
 });
-ok("logging is closed outside a meeting night", () => {
-  night("");
-  assert.match(roster().error, /meeting night/);
-  assert.match(submit({ name: "Jamie K.", chips: 1000 }).error, /meeting night/);
-  night("2026-10-10"); // a night no week column names
-  assert.match(roster().error, /meeting night/);
-});
-ok("the name list needs the meeting code, is sorted, and has no emails", () => {
+ok("member logging is retired: roster, submit and review are refused and write nothing", () => {
   night("2026-10-16");
-  setStack("10000");
-  assert.match(roster({ code: "" }).error || "", /not right/);
-  eq(roster({ code: "WRONG1" }).field, "code");
-  const r = roster();
-  eq([r.ok, r.week, r.startingStack], [true, "Oct 16", 10000]);
-  assert.ok(r.names.includes("Jamie K.") && r.names.includes("Robin S."));
-  eq(r.names, r.names.slice().sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())));
-  assert.ok(!JSON.stringify(r).includes("@"));
-});
-ok("a logged result checks the code, the name and the chip count", () => {
-  eq(submit({ code: "WRONG1", name: "Jamie K.", chips: 100 }).field, "code");
-  eq(submit({ name: "Nobody Here", chips: 100 }).field, "name");
-  eq(submit({ name: "=HYPERLINK(1)", chips: 100 }).field, "name");
-  for (const chips of [-1, 2.5, 10000001, "abc", null, "=1+1"]) eq(submit({ name: "Jamie K.", chips }).field, "chips");
-});
-ok("a logged result waits as pending and stays off the public ledger", () => {
-  const r = submit({ name: "jamie k.", chips: "12,500" });
-  eq([r.ok, r.name, r.week, r.result, r.replaced], [true, "Jamie K.", "Oct 16", 2500, false]);
-  assert.strictEqual(get().players.find((p) => p.name === "Jamie K.").results[1], null);
-  eq(subRow("Jamie K.").slice(2, 10), ["Oct 16", "Jamie K.", 12500, 10000, 2500, "pending", 1, ""]);
-});
-ok("the same count sent again (a retry after a slow answer) changes nothing", () => {
-  const r = submit({ name: "Jamie K.", chips: 12500 });
-  eq([r.ok, r.result, r.replaced], [true, 2500, false]);
-  eq(subRow("Jamie K.").slice(4, 10), [12500, 10000, 2500, "pending", 1, ""]);
-});
-ok("logging again updates the same row and keeps the earlier number", () => {
-  const rows = G.__submissions().getLastRow();
-  const r = submit({ name: "Jamie K.", chips: 13000 });
-  eq([r.ok, r.replaced], [true, true]);
-  eq(G.__submissions().getLastRow(), rows);
-  eq(subRow("Jamie K.").slice(4, 10), [13000, 10000, 3000, "pending", 2, 12500]);
-});
-ok("a member can log at most five times a night", () => {
-  for (const chips of [13001, 13002, 13003]) eq(submit({ name: "Jamie K.", chips }).ok, true);
-  assert.match(submit({ name: "Jamie K.", chips: 1 }).error, /5 times/);
-  eq(subRow("Jamie K.").slice(4, 10), [13003, 10000, 3003, "pending", 5, 13002]);
-  eq([submit({ name: "Jamie K.", chips: 13003 }).ok, subRow("Jamie K.")[8]], [true, 5]); // a repeat is not a sixth log
+  for (const action of ["roster", "submit"]) assert.ok(post({ action, code: CODE, name: "Jamie K.", chips: 100 }).auth, action);
+  eq(admin("review", { id: "x", decision: "approve", chips: 1 }).error, "Unknown action.");
+  eq(G.__submissions(), undefined);
 });
 ok("a request that cannot get the lock in time says the ledger is busy", () => {
   G.__lockBusy = true;
   try {
-    assert.match(submit({ name: "Robin S.", chips: 7000 }).error, /^The ledger is busy/);
-    assert.strictEqual(pendingFor("Robin S."), undefined);
+    assert.match(post({ action: "checkin", code: CODE, email: "robin@uchicago.edu" }).error, /^The ledger is busy/);
   } finally {
     G.__lockBusy = false;
   }
 });
-ok("the board tool opens on tonight and gets each waiting entry once, with no emails", () => {
+ok("the board tool opens on tonight, with no emails and nothing about logged entries", () => {
   const d = admin("load").data;
   eq([d.tonight, d.defaultWeek, d.meetingCode], ["Oct 16", "Oct 16", CODE]);
-  eq(d.submissions.filter((s) => s.name === "Jamie K.").map((s) => [s.chips, s.stack, s.result, s.times, s.earlier]), [[13003, 10000, 3003, 5, 13002]]);
+  eq([d.submissions, d.handled], [undefined, undefined]);
   assert.ok(!JSON.stringify(d).includes("@"));
 });
-ok("approving needs the board password and a counted number of chips", () => {
-  const s = pendingFor("Jamie K.");
-  assert.ok(post({ action: "review", key: "nope", id: s.id, decision: "approve", chips: 12000 }).auth);
-  for (const chips of [undefined, "", -5, 2.5, 10000001]) assert.match(admin("review", { id: s.id, decision: "approve", chips }).error, /chips you counted/);
-  eq(pendingFor("Jamie K.").id, s.id);
-});
-ok("approving writes counted chips minus the entry's own stack and keeps the member's number", () => {
-  setStack("20000"); // the board tool's stack changed after Jamie logged against 10,000
-  const s = pendingFor("Jamie K.");
-  const r = admin("review", { id: s.id, decision: "approve", chips: 12000 });
-  eq([r.ok, r.name, r.week, r.result], [true, "Jamie K.", "Oct 16", 2000]);
-  assert.strictEqual(get().players.find((p) => p.name === "Jamie K.").results[1], 2000);
-  const row = subRow("Jamie K.");
-  eq([row[4], row[6], row[7], row[8], row[9], row[10], row[11]], [13003, 2000, "approved", 5, 13002, 12000, "Max L."]);
-  assert.ok(G.__log().g.slice(-1)[0].slice(1, 4).join(" | ").startsWith("approved result | Oct 16: Jamie K., counted 12000 (logged 13003) | Max L."));
-  setStack("10000");
-});
-ok("an approved result cannot be approved twice or logged over", () => {
-  const id = subRow("Jamie K.", "approved")[0];
-  assert.match(admin("review", { id, decision: "approve", chips: 12000 }).error, /already approved/);
-  assert.match(submit({ name: "Jamie K.", chips: 20000 }).error, /already on the ledger/);
-});
-ok("rejecting writes nothing and lets the member log again", () => {
-  eq(submit({ name: "Robin S.", chips: 8000 }).ok, true);
-  const r = admin("review", { id: pendingFor("Robin S.").id, decision: "reject" });
-  eq([r.ok, r.decision, r.name], [true, "reject", "Robin S."]);
-  assert.strictEqual(get().players.some((p) => p.name === "Robin S."), false);
-  eq(subRow("Robin S.", "rejected")[11], "Max L.");
-  eq(submit({ name: "Robin S.", chips: 9000 }).ok, true);
-  eq(pendingFor("Robin S.").chips, 9000);
-  eq(admin("load").data.handled, { "Oct 16": 2 });
-});
-ok("bad review requests are refused and change nothing", () => {
-  const s = pendingFor("Robin S.");
-  assert.match(admin("review", { id: s.id, decision: "delete" }).error, /approve or reject/);
-  assert.match(admin("review", { id: "nope", decision: "approve", chips: 1 }).error, /no longer there/);
-  eq(pendingFor("Robin S.").id, s.id);
-});
-ok("approving never overwrites a result the board typed in, and that result locks logging", () => {
-  admin("save", { week: "Oct 16", entries: [{ name: "Robin S.", value: 9500 }], startingStack: 10000 });
-  assert.match(admin("review", { id: pendingFor("Robin S.").id, decision: "approve", chips: 9000 }).error, /already has a result/);
-  assert.strictEqual(get().players.find((p) => p.name === "Robin S.").results[1], -500);
-  assert.match(submit({ name: "Robin S.", chips: 9500 }).error, /already on the ledger/);
-});
-ok("a profit-or-loss save does not close logging", () => {
-  admin("save", { week: "Oct 9", entries: [{ name: "Late", value: 300 }] }); // no stack, so 0 is stored
-  eq(G.getAdminData_().startingStack, 0);
-  const r = roster();
-  eq([r.ok, r.startingStack], [true, 250]);
-  eq(submit({ name: "Late", chips: 550 }).result, 300);
-  setStack("10000");
-});
-ok("someone who joins at the meeting can log right away", () => {
-  eq(join({ name: "New Face", email: "newface@uchicago.edu", year: "2030" }).ok, true);
-  assert.ok(roster().names.includes("New Face"));
-});
-ok("after the night, the board tool opens on the week with entries still waiting", () => {
-  night("");
-  eq([admin("load").data.tonight, admin("load").data.defaultWeek], ["", "Oct 16"]);
-  night("2026-10-16");
+ok("someone who joins at the meeting is on the ledger at once", () => {
+  eq(join({ name: "New Face", email: "newface@uchicago.edu", year: "2030" }).checkedIn, "Oct 16");
+  assert.ok(admin("load").data.players.some((p) => p.name === "New Face"));
 });
 ok("a week cell Sheets turned into a date still reads as its label", () => {
-  const sh = G.__submissions(), r = sh.g.findIndex((x) => x && x[3] === "Late");
-  sh.g[r][2] = new Date("2026-10-16T17:00:00Z");
-  eq(pendingFor("Late").week, "Oct 16");
-  sh.g[r][2] = "Oct 16";
+  const sh = G.__checkins(), r = sh.g.findIndex((x) => x && x[1] === "New Face");
+  sh.g[r][0] = new Date("2026-10-16T17:00:00Z");
+  assert.ok(admin("load").data.checkins["Oct 16"].some((c) => c.name === "New Face"));
+  sh.g[r][0] = "Oct 16";
+});
+ok("after the night, the board tool opens on the first week with no results", () => {
+  night("");
+  const d = admin("load").data;
+  const first = d.weeks.find((w, i) => !d.players.some((p) => p.results[i] !== null));
+  eq([d.tonight, d.defaultWeek], ["", first]);
+  night("2026-10-16");
 });
 ok("the board can change and close the meeting code from the board tool", () => {
   eq(admin("setCode", { code: "poker-27" }).code, "POKER27");
-  eq(roster().field, "code");
+  eq(post({ action: "checkin", code: CODE, email: "oldpage@uchicago.edu" }).field, "code");
   CODE = "POKER27";
-  eq(roster().ok, true);
+  eq(post({ action: "checkin", code: CODE, email: "oldpage@uchicago.edu" }).ok, true);
   eq(admin("setCode", { code: "abc" }).ok, false);
   assert.ok(G.__log().g.slice(-1)[0].slice(1, 4).join(" | ").startsWith("meeting code | code changed | Max L."));
   assert.ok(post({ action: "setCode", key: "nope", code: "HACKED1" }).auth);
-  eq(roster().ok, true);
+  eq(post({ action: "checkin", code: CODE, email: "oldpage@uchicago.edu" }).ok, true);
 });
-ok("set up adds the Submissions tab with headers, and running it again is safe", () => {
+ok("set up no longer makes a Submissions tab, and leaves an old one alone", () => {
   G.setupSheet();
+  eq(G.__submissions(), undefined);
+  G.SpreadsheetApp.getActiveSpreadsheet().insertSheet("Submissions").appendRow(["ID", "Logged"]);
   G.setupSheet();
-  eq(G.__submissions().g[0], ["ID", "Logged", "Week", "Name", "Chips", "Stack", "Result", "Status", "Times", "Earlier chips", "Counted", "Reviewed by", "Reviewed at"]);
+  eq(G.__submissions().g[0], ["ID", "Logged"]);
 });
-ok("unapproved results never reach the public feed", () => {
-  eq(get().players.some((p) => p.name === "New Face"), false);
-  eq(get().players.find((p) => p.name === "Late").results.slice(0, 2), [300, null]);
-});
-ok("weeks added from the menu must be dates members can log on", () => {
+ok("weeks added from the menu must be dates check-in can open on", () => {
   assert.match(G.addWeek_("Week 8").error, /meeting date/);
   eq(G.addWeek_("Dec 4").ok, true);
   eq(get().weeks.slice(-1)[0], "Dec 4");
@@ -639,9 +540,9 @@ ok("an entry without was (a page from before the guard) is written as before", (
   eq(as("Phone C", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Mo R.", value: 260 }] }).saved, 1);
   eq(nov6("Mo R."), 10);
 });
-ok("missing bags, take-backs and approvals are in the History too", () => {
+ok("missing bags and take-backs are in the History too", () => {
   const actions = G.__history().g.slice(1).filter(Boolean).map((x) => x[6]);
-  for (const a of ["no bag", "check-in taken back", "approved log"]) assert.ok(actions.includes(a), a);
+  for (const a of ["no bag", "check-in taken back"]) assert.ok(actions.includes(a), a);
   eq(G.__history().g.slice(1).find((x) => x && x[6] === "no bag" && x[2] === "Fresh Joiner").slice(3, 6), ["", -250, 250]);
 });
 ok("the board tool gets the History by week, and the public feed gets none of it", () => {

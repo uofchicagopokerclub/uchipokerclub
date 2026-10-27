@@ -25,7 +25,7 @@ so commits never carry another account's email.
 2. Extensions > Apps Script. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo. Save.
 3. Reload the Sheet. A **Ledger** menu appears:
    - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries,
-     Submissions, Check-ins and History tabs, and inserts the Major column after Source in a Players tab made before 2026-10-09. Safe to run again: it only adds what is missing, and puts back any mailing list row that
+     Check-ins and History tabs, and inserts the Major column after Source in a Players tab made before 2026-10-09. Safe to run again: it only adds what is missing, and puts back any mailing list row that
      an older version wrote out of column order. The mailing list columns can be reordered freely: sign-ups are
      written by header name (Email, First Name, Last Name, Joined, Source, Class Year, Major). A header that is
      missing is added after the last column in use, by Set up sheet or by the next sign-up.
@@ -117,8 +117,8 @@ count. Anyone who checked in and hands in no bag is recorded at 0 chips. /ledger
 7. When the meeting ends, clear the meeting code (Change, empty, Save code), so last week's code cannot be used
    to join or check in before the next meeting.
 
-Entries members logged before 2026-10-16 and never approved still show under **To approve** in the board tool, and
-it opens on their week after the meeting night until they are handled. The list disappears once nothing is waiting.
+The Submissions tab holds what members logged themselves on Oct 9, when they still did (until 2026-10-16). Nothing
+reads or writes it since 2026-10-27; keep it as a record or delete it.
 
 Google is sometimes slow, up to about a minute for one answer. After a few seconds every form says "Still working".
 Members' forms stop waiting after a minute and keep what was typed; sending again is safe, because the backend
@@ -129,7 +129,7 @@ when you tap **Refresh**.
 ## Everyday
 
 - **Change the site:** edit `content/club.js` on github.com (pencil icon), commit to `main`. Live in about a minute.
-- **Record a week:** www.uchipokerclub.com/ledger/record (board password), or approve what members logged.
+- **Record a week:** www.uchipokerclub.com/ledger/record (board password).
 - **New term:** update the schedule and events in `content/club.js`; update `TERM` and `WEEKS` in `Code.gs` and
   deploy a new version first (the week dates take their year from `TERM`); then in the Sheet, Ledger > Add a week
   for each meeting. `npm test` checks that `WEEKS` falls on the weekly meeting dates; Add a week refuses a label
