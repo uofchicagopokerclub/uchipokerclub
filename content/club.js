@@ -132,6 +132,40 @@ export const schedule = {
   afterLast: 'The Winter schedule goes up here once it is set.',
 };
 
+// Slides from each week's strategy lecture, shown newest first. The PDFs live in public/lectures. Before a deck goes
+// up, its cover, chip log and socials slides come out, because they carry QR codes and the meeting code (Max,
+// 2026-10-27).
+export const lectures = {
+  term: TERM,
+  intro: 'Every meeting opens with a strategy lecture from the board. The slides from each week are here.',
+  decks: [
+    {
+      date: '2026-10-09',
+      title: 'How to play',
+      topics: ['The basics and hand rankings', 'Positions', 'Street play', 'Beginner strategy'],
+      file: '/lectures/2026-10-09-how-to-play.pdf',
+      slides: 10,
+      size: '0.8 MB',
+    },
+    {
+      date: '2026-10-16',
+      title: 'Preflop and poker math',
+      topics: ['What we saw last week', 'Pot odds', 'Equity and outs', 'Preflop fundamentals'],
+      file: '/lectures/2026-10-16-preflop-and-poker-math.pdf',
+      slides: 12,
+      size: '0.5 MB',
+    },
+    {
+      date: '2026-10-23',
+      title: 'Implied odds and hand histories',
+      topics: ['Poker terminology', 'Implied odds', 'Guess the stake', 'How to write a hand'],
+      file: '/lectures/2026-10-23-implied-odds-and-hand-histories.pdf',
+      slides: 16,
+      size: '0.6 MB',
+    },
+  ],
+};
+
 export const events = [
   {
     date: '2026-10-22',

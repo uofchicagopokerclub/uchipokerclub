@@ -246,6 +246,17 @@ main > :last-child { padding-bottom: 0; }
 .event + .event { padding-left: 32px; border-left: 1px solid var(--rule); }
 .event-date { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--maroon); }
 .event h3 { font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); margin: 8px 0 16px; }
+/* lecture slides: one row per week, newest first */
+.decks { list-style: none; margin-top: clamp(28px, 4vw, 48px); border-top: 1px solid var(--rule); }
+.deck { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 32px; align-items: center; padding: 28px 0; border-bottom: 1px solid var(--rule); }
+.deck h2 { font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); margin: 8px 0 14px; }
+.deck .ticks li { margin-bottom: 6px; }
+.deck-get { display: grid; gap: 8px; justify-items: end; }
+.deck-meta { font-size: 0.875rem; color: var(--muted); }
+@media (max-width: 639px) {
+  .deck { grid-template-columns: minmax(0, 1fr); }
+  .deck-get { justify-items: start; }
+}
 @media (max-width: 767px) {
   .events { grid-template-columns: minmax(0, 1fr); }
   .event + .event { padding-left: 0; border-left: 0; border-top: 1px solid var(--rule); }

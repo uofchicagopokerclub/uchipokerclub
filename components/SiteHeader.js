@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react';
 import { club } from '../content/club';
 import { InstagramIcon } from './Icons';
 
-// Same four pages as the old site, plus the ledger.
+// Same four pages as the old site, plus the ledger and the lecture slides.
 export const NAV = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
   { href: '/team', label: 'Team' },
   { href: '/ledger', label: 'Ledger' },
+  { href: '/lectures', label: 'Lectures' },
   { href: '/contact', label: 'Contact' },
 ];
 
