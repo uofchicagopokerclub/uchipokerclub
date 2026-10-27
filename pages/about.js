@@ -59,7 +59,7 @@ export default function About({ now }) {
 
       <section className="section" id="events" aria-labelledby="events-title">
         <div className="wrap">
-          <h2 id="events-title" className="section-title ruled">Two events this term</h2>
+          <h2 id="events-title" className="section-title ruled">{eventsTitle(events.length)}</h2>
           <div className="events">
             {events.map((e) => (
               <article className="event" key={e.title}>
@@ -73,6 +73,12 @@ export default function About({ now }) {
       </section>
     </>
   );
+}
+
+// "Three events this term", counted from the list so the heading never goes stale when one is added.
+const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+function eventsTitle(n) {
+  return `${COUNT_WORDS[n] || n} ${n === 1 ? 'event' : 'events'} this term`;
 }
 
 // Hourly, so past meetings grey out and "Next" moves along on its own.

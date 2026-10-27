@@ -123,6 +123,7 @@ export const schedule = {
     // at the end of the day; the real time and room go to selected attendees.
     { date: '2026-10-22', start: '00:00', end: '23:59', place: '', what: 'Bid or Bluff with Susquehanna', event: true, inviteOnly: true },
     { date: '2026-10-23', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
+    { date: '2026-10-28', start: '00:00', end: '23:59', place: '', what: 'Citadel Securities Trading Challenge', event: true, inviteOnly: true },
     { date: '2026-10-30', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-06', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-08', start: '10:30', end: '13:30', place: 'Ida Noyes Hall, Library and Lounge', what: 'Fall tournament', event: true },
@@ -173,6 +174,14 @@ export const events = [
     points: [
       'An evening of food, networking, and competition with Susquehanna for a select group of UChicago students.',
       'Bid or Bluff is a fast-paced game of strategy, deduction, and nerve. Prizes include a Nintendo Switch 2.',
+      'This event is invite-only. Selected attendees were notified by email.',
+    ],
+  },
+  {
+    date: '2026-10-28',
+    title: 'Citadel Securities Trading Challenge',
+    points: [
+      'Citadel Securities brings its Trading Challenge to campus for a select group of UChicago students.',
       'This event is invite-only. Selected attendees were notified by email.',
     ],
   },
