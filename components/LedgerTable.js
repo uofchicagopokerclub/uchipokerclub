@@ -52,10 +52,15 @@ function Move({ p }) {
   );
 }
 
-function Last({ p, inline }) {
-  if (p.last === null) return <span className="dnp">{inline ? 'did not play' : 'DNP'}</span>;
-  return <span className={tone(p.last)}>{signed(p.last)}</span>;
+// One week's profit or loss, or DNP for a week the player missed.
+function Result({ v }) {
+  if (v === null || v === undefined) return <span className="dnp" title="Did not play">DNP</span>;
+  return <span className={tone(v)}>{signed(v)}</span>;
 }
+
+// Every week fits on a laptop. A tablet shows the latest few, and a phone, with room for the name and the total
+// only, carries them in the line under the name.
+const RECENT_WEEKS = 3;
 
 function SkeletonRows({ cols }) {
   return Array.from({ length: 6 }, (_, i) => (
@@ -69,7 +74,7 @@ export default function LedgerTable({ standings, status }) {
   const [q, setQ] = useState('');
   const [expanded, setExpanded] = useState(false);
 
-  const { latest, weeks, players } = standings;
+  const { latest, weeks, players, playedWeeks = [] } = standings;
   const label = latest >= 0 ? weeks[latest] : '';
   const showMove = latest > 0;
   const paidPlaces = ledger.payouts.length;
@@ -80,7 +85,9 @@ export default function LedgerTable({ standings, status }) {
   const list = query ? players.filter((p) => searchKey(p.name).includes(query)) : players;
   const limited = !query && !expanded && list.length > limit + 5;
   const shown = limited ? list.slice(0, limit) : list;
-  const cols = showMove ? 7 : 6;
+  const cols = (showMove ? 5 : 4) + playedWeeks.length; // rank, move, player, one per week, total, prize
+  const recent = playedWeeks.slice(-RECENT_WEEKS).reverse();
+  const weekClass = (i) => `c-week num${i < playedWeeks.length - RECENT_WEEKS ? ' c-week-old' : ''}`;
 
   if (status === 'error') {
     return <p className="ledger-state">Standings could not load right now. Refresh the page to try again.</p>;
@@ -117,8 +124,7 @@ export default function LedgerTable({ standings, status }) {
               <th className="c-rank" scope="col">#</th>
               {showMove && <th className="c-move" scope="col"><span className="sr-only">Change since last week</span></th>}
               <th scope="col">Player</th>
-              <th className="c-wk num" scope="col">Weeks</th>
-              <th className="c-last num" scope="col">{label || 'Last'}</th>
+              {playedWeeks.map((w, i) => <th key={weeks[w]} className={weekClass(i)} scope="col">{weeks[w]}</th>)}
               <th className="c-total num" scope="col">Ledger</th>
               <th className="c-pay" scope="col"><span className="sr-only">Prize</span></th>
             </tr>
@@ -142,12 +148,11 @@ export default function LedgerTable({ standings, status }) {
                   <td>
                     <span className="nm">{p.name}</span>
                     <span className="sub">
-                      {showMove && <><Move p={p} />{', '}</>}
-                      {p.played} {p.played === 1 ? 'wk' : 'wks'}, {label} <Last p={p} inline />
+                      {showMove && <span><Move p={p} /></span>}
+                      {recent.map((w) => <span key={weeks[w]}>{weeks[w]} <Result v={p.results[w]} /></span>)}
                     </span>
                   </td>
-                  <td className="c-wk num">{p.played}</td>
-                  <td className="c-last num"><Last p={p} /></td>
+                  {playedWeeks.map((w, i) => <td key={weeks[w]} className={weekClass(i)}><Result v={p.results[w]} /></td>)}
                   <td className={`c-total num ${tone(p.total)}`}>
                     {signed(p.total)}
                     {paid && <span className={`${pill} pill-m`}>{prize}</span>}

@@ -367,13 +367,15 @@ select.input {
 .ledger-table .num { text-align: right; }
 .ledger-table .c-rank { width: 48px; font-weight: 700; white-space: nowrap; }
 .ledger-table .c-move { width: 56px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
-.ledger-table .c-wk { width: 76px; color: var(--muted); }
-.ledger-table .c-last { width: 100px; }
+.ledger-table .c-week { width: 84px; }
+@media (max-width: 899px) { .ledger-table .c-week-old { display: none; } }
 .ledger-table .c-total { width: 112px; }
 .ledger-table td.c-total { font-size: 1.0625rem; font-weight: 700; }
 .ledger-table .c-pay { width: 72px; text-align: right; }
 .ledger-table .nm { font-weight: 600; }
-.ledger-table .sub { display: none; font-size: 0.8125rem; color: var(--muted); margin-top: 2px; }
+/* On phones: the last few weeks under the name, each kept whole so a line breaks between weeks, never inside one. */
+.ledger-table .sub { display: none; flex-wrap: wrap; gap: 0 12px; font-size: 0.8125rem; color: var(--muted); margin-top: 2px; }
+.ledger-table .sub > span { white-space: nowrap; }
 .ledger-table tbody tr:hover td { background: #f8f8f8; }
 .ledger-table tr.paid td, .ledger-table tr.paid:hover td { background: var(--tint); }
 .ledger-table tr.paid td:first-child { box-shadow: inset 3px 0 0 var(--maroon); }
@@ -396,9 +398,9 @@ select.input {
 .more { display: block; width: 100%; margin-top: 16px; }
 .ledger-foot { margin-top: 20px; font-size: 0.875rem; color: var(--muted); max-width: 70ch; }
 @media (max-width: 599px) {
-  .ledger-table .c-move, .ledger-table .c-wk, .ledger-table .c-last, .ledger-table .c-pay { display: none; }
+  .ledger-table .c-move, .ledger-table .c-week, .ledger-table .c-pay { display: none; }
   .ledger-table .pill-m { display: block; width: max-content; margin: 5px 0 0 auto; }
-  .ledger-table .sub { display: block; }
+  .ledger-table .sub { display: flex; }
   .ledger-table td, .ledger-table th { padding-left: 6px; padding-right: 6px; }
   .ledger-table .c-rank { width: 38px; }
   .ledger-table .c-total { width: auto; }

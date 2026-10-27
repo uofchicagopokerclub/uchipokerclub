@@ -92,3 +92,12 @@ test('check-ins for a week: who is in, and who has no bag counted yet', () => {
   assert.deepEqual(checkinsFor(data, 0).noBag, []);
   assert.equal(checkinsFor({ ...data, checkins: undefined }, 1), null);
 });
+
+test('played weeks are the weeks with any result, oldest first, skipping a week nobody played', () => {
+  const s = computeStandings({
+    weeks: ['Oct 9', 'Oct 16', 'Oct 23', 'Oct 30'],
+    players: [{ name: 'Ava', results: [100, null, -50, null] }, { name: 'Bo', results: [null, null, 25, null] }],
+  });
+  assert.deepEqual(s.playedWeeks, [0, 2]);
+  assert.deepEqual(computeStandings(null).playedWeeks, []);
+});
