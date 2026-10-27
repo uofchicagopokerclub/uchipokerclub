@@ -196,11 +196,11 @@ export const board = {
     { name: 'Levi Stein', role: 'Co-Head of Education', year: '2028', photo: '/images/board/levi-stein.webp' },
     { name: "Tad O'Brien", role: 'Co-Head of Education', year: '2028', photo: '/images/board/tad-obrien.webp' },
     { name: 'Noah Kahn', role: 'VP Communications', year: '2027', photo: '/images/board/noah-kahn.webp' },
-    { name: 'Ryan Bliss', role: 'Vice President', year: '2029', photo: '/images/board/ryan-bliss.webp' },
-    { name: 'Jesse Roonprapunt', role: 'VP Growth', year: '2028', photo: '/images/board/jesse-roonprapunt.webp' },
     { name: 'Mihir Shrestha', role: 'VP Events', year: '2028', photo: '/images/board/mihir-shrestha.webp' },
-    { name: 'Max Linton', role: 'VP Events', year: '2029', photo: '/images/board/max-linton.webp' },
+    { name: 'Ryan Bliss', role: 'Vice President', year: '2029', photo: '/images/board/ryan-bliss.webp' },
     { name: 'Dylan Dolotta', role: 'VP Events', year: '2029', photo: '/images/board/dylan-dolotta.webp' },
+    { name: 'Jesse Roonprapunt', role: 'VP Growth', year: '2028', photo: '/images/board/jesse-roonprapunt.webp' },
+    { name: 'Max Linton', role: 'VP Events', year: '2029', photo: '/images/board/max-linton.webp' },
   ],
 };
 
