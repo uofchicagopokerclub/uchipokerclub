@@ -193,6 +193,7 @@ export const board = {
   members: [
     { name: 'Max Lacombe', role: 'Co-President', year: '2028', photo: '/images/board/max-lacombe-2.webp' },
     { name: 'Zach Khambatta', role: 'Co-President', year: '2028', photo: '/images/board/zach-khambatta.webp' },
+    { name: 'Ryan Bliss', role: 'Vice President', year: '2029', photo: '/images/board/ryan-bliss.webp' },
     { name: 'Levi Stein', role: 'Co-Head of Education', year: '2028', photo: '/images/board/levi-stein.webp' },
     { name: "Tad O'Brien", role: 'Co-Head of Education', year: '2028', photo: '/images/board/tad-obrien.webp' },
     { name: 'Noah Kahn', role: 'VP Communications', year: '2027', photo: '/images/board/noah-kahn.webp' },
