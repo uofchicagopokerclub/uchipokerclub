@@ -92,10 +92,10 @@ export const about = {
     "We aim to build members' analytical and mathematical skills through poker strategy, with an emphasis on understanding the decision-making process.",
     'Weekly sessions teach new players the basics and GTO (game theory optimal) play, with the goal of reducing variance and improving long-term results.',
   ],
-  // Source: the club's 2026-2027 sponsorship prospectus.
+  // Source: the club's 2026-2027 sponsorship prospectus, except the mailing list count (Max, 2026-10-27).
   facts: [
     { value: 'Winter 2024', label: 'Founded' },
-    { value: '430+', label: 'Students on the mailing list, Fall 2026' },
+    { value: '570+', label: 'Students on the mailing list, Fall 2026' },
     { value: 'About 40', label: 'Members of the 2025-2026 advanced cohort' },
   ],
   meeting: [
