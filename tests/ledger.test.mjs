@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkinsFor, computeStandings, parseChips, signed, cleanFeed, wholeChips } from '../lib/ledger.js';
+import { checkinsFor, computeStandings, historyFor, parseChips, resultText, signed, cleanFeed, wholeChips } from '../lib/ledger.js';
 
 const feed = {
   term: 'Fall 2026',
@@ -100,4 +100,24 @@ test('played weeks are the weeks with any result, oldest first, skipping a week 
   });
   assert.deepEqual(s.playedWeeks, [0, 2]);
   assert.deepEqual(computeStandings(null).playedWeeks, []);
+});
+
+test('history for a week groups each player\'s changes, oldest first, and reads as chips', () => {
+  const data = {
+    weeks: ['Oct 23', 'Oct 30'],
+    players: [],
+    history: { 'Oct 30': [
+      { name: 'Ava', before: null, after: 50, stack: 250, by: 'Max', action: 'board save' },
+      { name: 'ava', before: 50, after: 70, stack: 250, by: 'Zach', action: 'board save' },
+      { name: 'Bo', before: null, after: -250, stack: 250, by: 'Max', action: 'no bag' },
+    ] },
+  };
+  const h = historyFor(data, 1);
+  assert.deepEqual(h.get('ava').map((x) => x.by), ['Max', 'Zach']);
+  assert.equal(historyFor(data, 0).size, 0);
+  assert.equal(historyFor({ ...data, history: undefined }, 1), null);
+  assert.equal(resultText(70, 250), '320 chips (+70)');
+  assert.equal(resultText(-250, 250), `0 chips (${signed(-250)})`);
+  assert.equal(resultText(70, 0), '+70');
+  assert.equal(resultText(null, 250), 'no result');
 });

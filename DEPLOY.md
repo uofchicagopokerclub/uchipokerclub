@@ -25,7 +25,7 @@ so commits never carry another account's email.
 2. Extensions > Apps Script. Replace the contents of `Code.gs` with `apps-script/Code.gs` from this repo. Save.
 3. Reload the Sheet. A **Ledger** menu appears:
    - **Set up sheet** (approve access once). Creates the Players, Log, Mailing list, Sponsor inquiries,
-     Submissions and Check-ins tabs, and inserts the Major column after Source in a Players tab made before 2026-10-09. Safe to run again: it only adds what is missing, and puts back any mailing list row that
+     Submissions, Check-ins and History tabs, and inserts the Major column after Source in a Players tab made before 2026-10-09. Safe to run again: it only adds what is missing, and puts back any mailing list row that
      an older version wrote out of column order. The mailing list columns can be reordered freely: sign-ups are
      written by header name (Email, First Name, Last Name, Joined, Source, Class Year, Major). A header that is
      missing is added after the last column in use, by Set up sheet or by the next sign-up.
@@ -96,13 +96,20 @@ count. Anyone who checked in and hands in no bag is recorded at 0 chips. /ledger
    **meeting code**, and show it in the room with the address uchipokerclub.com/ledger/checkin.
 2. Check the board tool's **Starting stack** field shows the stack handed out (250). To change it, type the stack
    and press Save.
-3. **Chips only for a check-in screen.** Members check in with the code and the email they joined with, and show the
-   confirmation (their name, "Checked in for" tonight). New members join at uchipokerclub.com/ledger/join, which checks
-   them in too. Someone without a phone: type their name in the board tool's find box and tap **Check in**.
+3. **Check everyone in before they get a bag of chips.** At the table, set the board tool to **Check in** (the switch
+   above the find box; the phone remembers it). Type a name and press Enter: an exact name is checked in at once and
+   the box clears for the next person; a partial name fills in first, so press Enter again. A name not on the ledger
+   is added and checked in with one Enter. Check-ins save in the background, so keep going while Google answers.
+   Members can also check themselves in at uchipokerclub.com/ledger/checkin and show the confirmation, and new
+   members joining at uchipokerclub.com/ledger/join are checked in too.
 4. At the end of the night, every player puts their chips in a plastic bag and writes on it the name they joined
    the ledger with, so it matches the find box.
-5. Count each bag. In the board tool, type the player's name in the find box (tap **Add** if they are new), enter the
-   chips counted in the table, and press **Save**. The table check reads "balanced" once every stack is in; anything
+5. Count each bag. Switch the board tool to **Count bags**, type the player's name in the find box (tap **Add** if
+   they are new), enter the chips counted in the table, and press **Save**. If another board phone already saved a
+   different count for that player, yours is not saved: the message says what they saved and when. Check the bag,
+   then press Save again to replace it. Under the find box, each player's changes for the week are listed, and a row
+   entered more than once says "Changed 2 times". Every change is also in the Sheet's History tab, and the Log tab
+   names each player and the number entered. The table check reads "balanced" once every stack is in; anything
    else means a bag is missing or miscounted. The public ledger updates within a minute.
 6. **Once every bag is counted, tap Missing bags.** It lists everyone checked in with no result. Look it over: if
    someone on it was not there, cancel, find them, and tap **Take back**. Then tap **Record ... at 0 chips**. A bag

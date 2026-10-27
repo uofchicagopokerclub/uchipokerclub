@@ -475,7 +475,7 @@ select.input {
 .form-ok .checkin-when { margin-top: 0; font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--maroon); }
 .form-ok .checkin-name { margin-top: 6px; font-size: 2.25rem; line-height: 1.1; overflow-wrap: anywhere; }
 .rec-table .ci { display: block; font-size: 0.8125rem; font-weight: 400; color: var(--muted); }
-.find-ci { display: flex; flex-wrap: wrap; align-items: center; font-size: 0.9375rem; color: var(--muted); }
+.find-ci p { display: flex; flex-wrap: wrap; align-items: center; font-size: 0.9375rem; color: var(--muted); }
 .find-ci .link-btn { min-height: var(--tap); margin-left: 4px; padding: 0 6px; }
 /* scroll-margin: the board tool's sticky footer would otherwise cover the panel's buttons when it scrolls into view */
 .nobag { margin-top: 22px; padding: 16px; background: var(--tint); border-left: 4px solid var(--maroon); scroll-margin-bottom: 220px; }
@@ -483,6 +483,18 @@ select.input {
 .nobag p { margin-top: 8px; color: var(--muted); }
 .nobag-names { margin-top: 10px; list-style: none; columns: 2 180px; column-gap: 16px; font-weight: 600; }
 .nobag .actions { margin-top: 16px; }
+
+/* board tool: check-in mode, and each player's History under the find box */
+.mode-switch { display: inline-flex; margin-top: 18px; border: 2px solid var(--maroon); }
+.mode-switch button { min-height: var(--tap); padding: 0 18px; font: inherit; font-weight: 700; color: var(--maroon); background: #fff; border: 0; cursor: pointer; }
+.mode-switch button[aria-pressed="true"] { color: #fff; background: var(--maroon); }
+.ci-table td.ci-cell { width: 190px; white-space: nowrap; }
+.ci-table td.ci-cell .btn { min-height: var(--tap); }
+.ci-in { font-size: 0.875rem; font-weight: 600; color: var(--pos); }
+.ci-wait { font-size: 0.875rem; color: var(--muted); }
+.rec-table .changed-tag { color: #8a5300; font-weight: 600; }
+.find-history { list-style: none; margin: 2px 0 8px; font-size: 0.875rem; color: var(--muted); }
+.find-history li + li { margin-top: 2px; }
 
 /* ---------- 404 ---------- */
 .notfound { padding-block: clamp(56px, 10vw, 120px); }

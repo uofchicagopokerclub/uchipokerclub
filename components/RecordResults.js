@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { postToLedger } from '../lib/api';
-import { checkinsFor, endSentence, nameKey, parseChips, signed, tone } from '../lib/ledger';
+import { checkinsFor, endSentence, historyFor, nameKey, parseChips, resultText, signed, tone } from '../lib/ledger';
 import { formatClock } from '../lib/schedule';
 import Approvals from './Approvals';
 import StillWorking from './StillWorking';
@@ -10,6 +10,7 @@ import SubmitButton from './SubmitButton';
 // hides the form. Without "Remember", the password lives in memory and is gone on refresh.
 const STORE_KEY = 'ucpc-board-key';
 const STORE_BY = 'ucpc-board-name';
+const STORE_MODE = 'ucpc-board-mode'; // this phone's last mode: the check-in table's phone stays in check-in mode
 const REMEMBER_MS = 30 * 24 * 3600 * 1000;
 
 function recall() {
@@ -55,6 +56,11 @@ export default function RecordResults() {
   const waiting = busy || pending > 0;
   const [codeEdit, setCodeEdit] = useState(null); // the meeting code being typed, or null when not editing
   const [noBagList, setNoBagList] = useState(null); // names the backend listed as checked in with no bag, or null
+  const [mode, setMode] = useState('count'); // count (enter bag counts) | checkin (check people in for chips)
+  // Check-ins wait in a queue and go one at a time, so the board can type the next name while Google answers.
+  const queue = useRef([]);
+  const draining = useRef(false);
+  const [queued, setQueued] = useState(() => new Set()); // name keys waiting or being sent
   const tableRef = useRef(null);
   const findRef = useRef(null);
   const focusFirst = useRef(false);
@@ -135,6 +141,10 @@ export default function RecordResults() {
   }, []);
 
   useEffect(() => {
+    try { if (localStorage.getItem(STORE_MODE) === 'checkin') setMode('checkin'); } catch {}
+  }, []);
+
+  useEffect(() => {
     session.current = { key: recall(), by: readName() };
     setByInput(session.current.by);
     if (!session.current.key) { setPhase('locked'); return; }
@@ -176,6 +186,10 @@ export default function RecordResults() {
   }, [edits, netFor, shown]);
 
   const changes = useMemo(() => (data ? data.players.filter(isChanged) : []), [data, isChanged]);
+  const ci = checkinsFor(data, week); // null from a backend older than check-in, which hides all of it
+  const hist = historyFor(data, week); // null from a backend older than the History tab
+  const at = (iso) => { const t = formatClock(iso); return t ? ` at ${t}` : ''; };
+
   // The starting stack is saved with results, so it can also be saved on its own.
   const stackChanged = Boolean(data) && start !== (data.startingStack || 0);
 
@@ -230,9 +244,11 @@ export default function RecordResults() {
   async function save() {
     // What is being sent, so entries typed while a slow save is in flight survive the reload after it.
     const sent = new Map(changes.map((p) => [nameKey(p.name), edits.get(nameKey(p.name))]));
+    // was: the result this tool is showing. If another phone saved that player since, the backend refuses the entry
+    // instead of overwriting it (the double-entry guard in Code.gs).
     const entries = changes.map((p) => {
       const t = sent.get(nameKey(p.name));
-      return { name: p.name, value: t.trim() === '' ? null : parseChips(t) };
+      return { name: p.name, value: t.trim() === '' ? null : parseChips(t), was: p.results[week] ?? null };
     });
     setBusy(true);
     setMsg({ text: '', kind: '' });
@@ -242,14 +258,24 @@ export default function RecordResults() {
       if (r.saved) parts.push(`Saved ${r.saved} ${r.saved === 1 ? 'result' : 'results'}`);
       if (r.cleared) parts.push(`cleared ${r.cleared}`);
       const missing = r.missing || [];
+      const conflicts = r.conflicts || [];
+      const refused = new Set(conflicts.map((c) => nameKey(c.name)));
       await load({ keepWeek: week, keepEdits: true });
+      // A refused count stays typed in, now against the number another phone saved: Save again replaces it on purpose.
       setEdits((m) => {
         const next = new Map(m);
-        sent.forEach((t, k) => { if (next.get(k) === t) next.delete(k); });
+        sent.forEach((t, k) => { if (next.get(k) === t && !refused.has(k)) next.delete(k); });
         return next;
       });
-      if (missing.length) {
-        setMsg({ text: `${parts.length ? `${parts.join(', ')}. ` : ''}Not saved, no longer on the ledger: ${missing.join(', ')}`, kind: 'err' });
+      if (missing.length || conflicts.length) {
+        const lines = [];
+        if (parts.length) lines.push(`${parts.join(', ')}.`);
+        for (const c of conflicts) {
+          lines.push(`Not saved: ${c.name} already has ${resultText(c.now, start)}${c.by ? `, saved by ${c.by}${at(c.at)}` : ''}.`);
+        }
+        if (conflicts.length) lines.push('Check the bag. To replace it with your count, press Save again.');
+        if (missing.length) lines.push(`Not saved, no longer on the ledger: ${missing.join(', ')}.`);
+        setMsg({ text: lines.join(' '), kind: 'err' });
       } else {
         if (!parts.length && stackChanged) setMsg({ text: `Starting stack saved: ${start ? start.toLocaleString('en-US') : 'none (profit or loss)'}.`, kind: 'ok' });
         else setMsg({ text: `${parts.join(', ') || 'No changes'} for ${r.week}.`, kind: 'ok' });
@@ -263,13 +289,24 @@ export default function RecordResults() {
 
   async function addPlayer() {
     const name = query.trim();
-    if (!name || waiting) return; // Enter in the find box reaches here even while a request is in flight
+    if (!name) return;
+    // Enter in the find box reaches here even while a request is in flight. Queued check-ins do not count: a new
+    // face at the check-in table never waits for the line ahead of them.
+    if (mode === 'checkin' ? busy : waiting) { setMsg({ text: 'Still saving. Press Add again in a moment.', kind: 'err' }); return; }
     setBusy(true);
     try {
       const r = await board('addPlayer', { name });
-      setData((d) => ({ ...d, players: [...d.players, { name: r.name, results: d.weeks.map(() => null) }] }));
-      setQuery(r.name);
+      const added = { name: r.name, results: data.weeks.map(() => null) };
+      setData((d) => ({ ...d, players: [...d.players, added] }));
       setMsg({ text: endSentence(`Added ${r.name}`), kind: 'ok' });
+      if (mode === 'checkin') {
+        // A new face at the check-in table: added and checked in with one Enter, and the find box is ready again.
+        setQuery('');
+        checkIn(added);
+        findRef.current?.focus();
+        return;
+      }
+      setQuery(r.name);
       focusFirst.current = true;
     } catch (err) {
       setMsg({ text: err.message, kind: 'err' });
@@ -294,9 +331,55 @@ export default function RecordResults() {
     }
   }
 
+  // A check-in or take-back the backend confirmed, applied to the data in place.
+  const applyCheckin = useCallback((r, on) => {
+    setData((d) => {
+      const list = ((d.checkins || {})[r.week] || []).filter((c) => nameKey(c.name) !== nameKey(r.name));
+      return { ...d, checkins: { ...d.checkins, [r.week]: on ? [...list, { name: r.name, at: r.at }] : list } };
+    });
+  }, []);
+
+  const drain = useCallback(async () => {
+    if (draining.current) return;
+    draining.current = true;
+    while (queue.current.length) {
+      const item = queue.current[0];
+      try {
+        const r = await board('setCheckin', { week: item.week, name: item.name, on: true });
+        applyCheckin(r, true);
+        setMsg({ text: endSentence(`Checked in ${r.name}`), kind: 'ok' });
+      } catch (err) {
+        if (err.auth) { queue.current = []; setQueued(new Set()); break; } // locked: the board unlocks and checks in again
+        setMsg({ text: `Not checked in: ${item.name}. ${err.message}`, kind: 'err' });
+      }
+      queue.current.shift();
+      setQueued((s) => { const next = new Set(s); next.delete(nameKey(item.name)); return next; });
+    }
+    draining.current = false;
+  }, [board, applyCheckin]);
+
+  // Check-in mode: queue a check-in for this week and come straight back, so the line keeps moving.
+  function checkIn(p) {
+    const k = nameKey(p.name);
+    if (queued.has(k) || ci?.at.has(k)) return;
+    queue.current.push({ name: p.name, week: data.weeks[week] });
+    setQueued((s) => new Set(s).add(k));
+    drain();
+  }
+
+  function switchMode(next) {
+    if (next === mode) return;
+    if (changes.length) { setMsg({ text: `Save or discard your changes to ${data.weeks[week]} first.`, kind: 'err' }); return; }
+    setMode(next);
+    setNoBagList(null);
+    setMsg({ text: '', kind: '' });
+    try { localStorage.setItem(STORE_MODE, next); } catch {}
+    setTimeout(() => findRef.current?.focus(), 0);
+  }
+
   // The board checks in someone without a phone, or takes back a check-in made by mistake.
   async function setCheckin(p, on) {
-    if (waiting) return;
+    if (mode === 'checkin' ? busy : waiting) return; // in check-in mode, queued check-ins do not block a take-back
     setBusy(true);
     try {
       const r = await board('setCheckin', { week: data.weeks[week], name: p.name, on });
@@ -304,10 +387,7 @@ export default function RecordResults() {
         // Taking it back also cleared the 0-chip result the missing-bags step had recorded, so fetch the table again.
         await load({ keepWeek: week, keepEdits: true });
       } else {
-        setData((d) => {
-          const list = ((d.checkins || {})[r.week] || []).filter((c) => nameKey(c.name) !== nameKey(r.name));
-          return { ...d, checkins: { ...d.checkins, [r.week]: on ? [...list, { name: r.name, at: r.at }] : list } };
-        });
+        applyCheckin(r, on);
       }
       setMsg({
         text: on ? endSentence(`Checked in ${r.name}`)
@@ -429,11 +509,12 @@ export default function RecordResults() {
   const seen = new Set();
   const dupes = [...new Set(data.players.map((p) => nameKey(p.name)).filter((k) => (seen.has(k) ? true : (seen.add(k), false))))];
   const label = data.weeks[week];
-  const ci = checkinsFor(data, week); // null from a backend older than check-in, which hides all of it
   const checkedAt = (p) => ci?.at.get(nameKey(p.name));
-  const at = (iso) => { const t = formatClock(iso); return t ? ` at ${t}` : ''; };
-  // The one player the find box points at, so the board can check them in or take it back.
-  const one = ci && q ? (data.players.find((p) => nameKey(p.name) === q) || (list.length === 1 ? list[0] : null)) : null;
+  // The one player the find box points at: their check-in and their History for the week show under it.
+  const one = q ? (data.players.find((p) => nameKey(p.name) === q) || (list.length === 1 ? list[0] : null)) : null;
+  const oneHistory = (one && hist?.get(nameKey(one.name))) || [];
+  const checking = mode === 'checkin' && ci; // check-in mode, on a backend that has check-in
+  const checkedCount = ci ? ci.at.size : 0;
 
   return (
     <div className="board-tool">
@@ -497,30 +578,65 @@ export default function RecordResults() {
         </p>
       )}
 
+      {ci && (
+        <div className="mode-switch" role="group" aria-label="What this phone is doing">
+          <button type="button" aria-pressed={!checking} onClick={() => switchMode('count')}>Count bags</button>
+          <button type="button" aria-pressed={Boolean(checking)} onClick={() => switchMode('checkin')}>Check in</button>
+        </div>
+      )}
+
       <div className="find">
         <label className="sr-only" htmlFor="find-player">Find or add a player</label>
         <input
-          id="find-player" ref={findRef} className="input" placeholder="Find or add a player" autoComplete="off" autoCapitalize="words" autoCorrect="off" spellCheck="false"
+          id="find-player" ref={findRef} className="input" autoComplete="off" autoCapitalize="words" autoCorrect="off" spellCheck="false"
+          placeholder={checking ? 'Type a name, then Enter to check them in' : 'Find or add a player'}
+          enterKeyHint={checking ? 'done' : undefined}
           value={query} onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return;
             e.preventDefault();
+            if (checking) {
+              // An exact name: check them in and clear the box for the next person. One partial match: fill in the full
+              // name first, so typing "alex" for a new Alex never checks in Alex Dennis unseen; Enter again checks in.
+              // No match: add and check in. Several: tap one.
+              if (!q) return;
+              if (one && nameKey(one.name) === q) { checkIn(one); setQuery(''); return; }
+              if (one) { setQuery(one.name); return; }
+              if (!list.length) addPlayer();
+              return;
+            }
             // Enter jumps to the first match. It adds a new player only when nothing matches at all.
             if (q && !list.length) { addPlayer(); return; }
             tableRef.current?.querySelector('tbody input')?.focus();
           }}
         />
         {q && !exact && (
-          <button className="btn btn-primary" type="button" onClick={addPlayer} disabled={waiting}>Add &ldquo;{query.trim()}&rdquo;</button>
+          <button className="btn btn-primary" type="button" onClick={addPlayer} disabled={checking ? busy : waiting}>
+            {checking ? <>Add and check in &ldquo;{query.trim()}&rdquo;</> : <>Add &ldquo;{query.trim()}&rdquo;</>}
+          </button>
         )}
       </div>
-      {one && (
-        <p className="find-ci">
-          {checkedAt(one) ? `${one.name} checked in${at(checkedAt(one))}.` : `${one.name} is not checked in for ${label}.`}
-          <button className="link-btn" type="button" onClick={() => setCheckin(one, !checkedAt(one))} disabled={waiting}>
-            {checkedAt(one) ? 'Take back' : 'Check in'}
-          </button>
-        </p>
+      {one && !checking && (ci || oneHistory.length > 0) && (
+        <div className="find-ci">
+          {ci && (
+            <p>
+              {checkedAt(one) ? `${one.name} checked in${at(checkedAt(one))}.` : `${one.name} is not checked in for ${label}.`}
+              <button className="link-btn" type="button" onClick={() => setCheckin(one, !checkedAt(one))} disabled={waiting}>
+                {checkedAt(one) ? 'Take back' : 'Check in'}
+              </button>
+            </p>
+          )}
+          {oneHistory.length > 0 && (
+            <ol className="find-history" aria-label={`Changes to ${one.name} for ${label}`}>
+              {oneHistory.map((h, i) => (
+                <li key={i}>
+                  {i === 0 ? '' : 'then '}{h.after === null ? 'cleared' : resultText(h.after, h.stack)} by {h.by || 'the board'}{at(h.at)}
+                  {h.action !== 'board save' ? ` (${h.action})` : ''}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       )}
 
       {/* Members stopped logging their own chips on 2026-10-16; the list only appears for entries still waiting. */}
@@ -531,7 +647,39 @@ export default function RecordResults() {
       {!data.players.length ? (
         <p className="ledger-state">No players yet. People join through the sign-up form, or type a name above and press Add.</p>
       ) : !list.length ? (
-        <p className="ledger-state">No player matches. Press Add to put them on the ledger.</p>
+        <p className="ledger-state">
+          {checking ? 'No player matches. Press Enter to add them and check them in.' : 'No player matches. Press Add to put them on the ledger.'}
+        </p>
+      ) : checking ? (
+        <div className="table-scroll">
+          <table className="rec-table ci-table">
+            <thead>
+              <tr><th>Player</th><th className="r">{label}</th></tr>
+            </thead>
+            <tbody>
+              {list.map((p, i) => {
+                const k = nameKey(p.name);
+                return (
+                  <tr key={`${p.name}#${i}`}>
+                    <td className="nm">{p.name}</td>
+                    <td className="r ci-cell">
+                      {queued.has(k) ? (
+                        <span className="ci-wait">Checking in&hellip;</span>
+                      ) : checkedAt(p) ? (
+                        <>
+                          <span className="ci-in">In{at(checkedAt(p))}</span>
+                          <button className="link-btn" type="button" onClick={() => setCheckin(p, false)} disabled={busy}>Take back</button>
+                        </>
+                      ) : (
+                        <button className="btn btn-primary" type="button" onClick={() => checkIn(p)}>Check in</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="table-scroll">
           <table className="rec-table" ref={tableRef}>
@@ -549,6 +697,10 @@ export default function RecordResults() {
                       {p.name}
                       {/* Short enough to stay on one line beside the chip box on a phone. */}
                       {checkedAt(p) && <span className="ci">{at(checkedAt(p)) ? `In${at(checkedAt(p))}` : 'Checked in'}</span>}
+                      {/* Two different counts entered for one player: worth a look at the bag. */}
+                      {(hist?.get(nameKey(p.name))?.length || 0) > 1 && (
+                        <span className="ci changed-tag">Changed {hist.get(nameKey(p.name)).length} times</span>
+                      )}
                     </td>
                     <td className="in">
                       {/* The iPhone number pad has no minus key, so profit or loss entries, which can be negative, get the full keyboard. */}
@@ -596,6 +748,17 @@ export default function RecordResults() {
         </div>
       )}
 
+      {checking ? (
+        <div className="rec-foot">
+          <p className="rec-stats">
+            <b>{checkedCount}</b> checked in for {label}
+            {queued.size > 0 && <>{'. '}<b>{queued.size}</b> still saving</>}
+            <button className="link-btn" type="button" onClick={refresh} disabled={waiting}>Refresh</button>
+          </p>
+          {msg.text && <span className={msg.kind === 'ok' ? 'msg-ok' : 'msg-err'} role="status">{msg.text}</span>}
+          <StillWorking busy={pending > 0} />
+        </div>
+      ) : (
       <div className="rec-foot">
         <p className="rec-stats">
           <b>{stats.played}</b> {stats.played === 1 ? 'player' : 'players'} this week
@@ -629,6 +792,7 @@ export default function RecordResults() {
         {/* Sticky at the bottom of the screen, so it shows wherever the board member tapped. */}
         <StillWorking busy={pending > 0} />
       </div>
+      )}
     </div>
   );
 }

@@ -143,7 +143,7 @@ ok("blank row between players does not shift writes", () => {
 });
 ok("every write is in the Log tab with who did it", () => {
   const rows = G.__log().g.slice(1).map(r => r.slice(1).join(" | "));
-  assert.ok(rows.some(r => r.startsWith("results | Oct 9: 2 saved, 0 cleared | Max L.")));
+  assert.ok(rows.some(r => r.startsWith("results | Oct 9: Jamie K. 12500 chips, +2500; Walk In 7500 chips, -2500 | Max L.")));
   assert.ok(rows.some(r => r.startsWith("add player | Walk In | Max L.")));
   assert.ok(rows.some(r => r.startsWith("join | Jamie K. | sign-up form")));
   assert.ok(rows.some(r => r.startsWith("board password | new password created")));
@@ -545,7 +545,7 @@ ok("no bags records 0 chips only for listed names still without a result, never 
   const r = admin("noBags", { week: "Oct 30", startingStack: 250, names: ["fresh joiner", "No Phone", "Jamie K.", "Day Joiner"] });
   eq([r.marked, r.names], [1, ["Fresh Joiner"]]);
   eq([oct30("Fresh Joiner"), oct30("No Phone"), oct30("Jamie K."), oct30("Day Joiner")], [-250, -130, 150, undefined]);
-  assert.ok(G.__log().g.some((x) => x && x[1] === "no bag, 0 chips" && x[2] === "Oct 30: Fresh Joiner" && x[3] === "Max L."));
+  assert.ok(G.__log().g.some((x) => x && x[1] === "no bag, 0 chips" && x[2] === "Oct 30: Fresh Joiner (each 0 chips, -250)" && x[3] === "Max L."));
   eq(admin("noBags", { week: "Oct 30", startingStack: 250 }).names, []);
 });
 ok("no bags needs a starting stack and a real week", () => {
@@ -581,6 +581,77 @@ ok("a join still succeeds when its check-in fails", () => {
   G.addCheckin_ = real;
   eq([r.ok, r.name, r.checkedIn], [true, "Busy Night", undefined]);
   eq(checkin({ email: "busy@uchicago.edu" }).name, "Busy Night");
+});
+
+console.log(" history, and the double-entry guard");
+const as = (by, action, o) => post(Object.assign({ action, key: KEY, by }, o));
+const nov6 = (name) => get().players.find((p) => p.name === name)?.results[4];
+const historyOf = (name, week = "Nov 6") => G.__history().g.slice(1).filter((x) => x && x[2] === name && x[1] === week);
+ok("every changed result gets a History row: before, after, stack, action, who", () => {
+  as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Jamie K.", value: 300, was: null }] });
+  as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Jamie K.", value: 320, was: 50 }] });
+  eq(historyOf("Jamie K.").map((x) => [x[3], x[4], x[5], x[6], x[7]]), [["", 50, 250, "board save", "Phone A"], [50, 70, 250, "board save", "Phone A"]]);
+  eq(Object.prototype.toString.call(historyOf("Jamie K.")[0][0]), "[object Date]"); // a Date from the script's realm
+});
+ok("saving the same number again adds no History row", () => {
+  as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Jamie K.", value: 320, was: 70 }] });
+  eq(historyOf("Jamie K.").length, 2);
+});
+ok("the Log names each player changed and the number entered", () => {
+  as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Walk In", value: 0, was: null }, { name: "Robin S.", value: 410, was: null }] });
+  const last = G.__log().g.filter(Boolean).slice(-1)[0];
+  eq([last[1], last[2], last[3]], ["results", "Nov 6: Walk In 0 chips, -250; Robin S. 410 chips, +160", "Phone A"]);
+  as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Robin S.", value: null, was: 160 }] });
+  eq(G.__log().g.filter(Boolean).slice(-1)[0][2], "Nov 6: Robin S. cleared (was +160)");
+});
+ok("a second phone cannot silently overwrite a count: it is refused for that player and says who saved it", () => {
+  // Both phones loaded Late with no Nov 6 result. B saves first; A's different count is refused, A's other entry is saved.
+  as("Phone B", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Late", value: 500, was: null }] });
+  const r = as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Late", value: 450, was: null }, { name: "New Face", value: 100, was: null }] });
+  eq([r.ok, r.saved, r.conflicts.map((c) => [c.name, c.now, c.by])], [true, 1, [["Late", 250, "Phone B"]]]);
+  assert.ok(!Number.isNaN(Date.parse(r.conflicts[0].at)));
+  eq([nov6("Late"), nov6("New Face")], [250, -150]);
+  assert.match(G.__log().g.filter(Boolean).slice(-1)[0][2], /New Face 100 chips, -150; not saved, changed on another phone first: Late$/);
+});
+ok("saving again from the refreshed tool overwrites on purpose, and both counts stay in the History", () => {
+  const r = as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Late", value: 450, was: 250 }] });
+  eq([r.saved, r.conflicts], [1, []]);
+  eq(nov6("Late"), 200);
+  eq(historyOf("Late").map((x) => [x[3], x[4], x[7]]), [["", 250, "Phone B"], [250, 200, "Phone A"]]);
+});
+ok("two phones typing the same count is not a conflict", () => {
+  as("Phone B", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Old Page", value: 90, was: null }] });
+  const r = as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Old Page", value: 90, was: null }] });
+  eq([r.saved, r.conflicts], [1, []]);
+  eq(historyOf("Old Page").length, 1);
+});
+ok("a number typed straight into the Sheet also stops a stale phone", () => {
+  const sh = G.__sheet(), row = sh.g.findIndex((x) => x && x[0] === "Mo R."), col = G.readTable_().fixed + 4;
+  sh.g[row][col] = 75;
+  eq(as("Phone A", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Mo R.", value: 10, was: null }] }).conflicts.map((c) => [c.name, c.now, c.by]), [["Mo R.", 75, undefined]]);
+  eq(nov6("Mo R."), 75);
+  // A player with History whose number was then changed in the Sheet is not credited to the last phone.
+  sh.g[sh.g.findIndex((x) => x && x[0] === "Late")][col] = 999;
+  eq(as("Phone C", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Late", value: 300, was: 200 }] }).conflicts.map((c) => [c.now, c.by]), [[999, undefined]]);
+  sh.g[sh.g.findIndex((x) => x && x[0] === "Late")][col] = 200;
+});
+ok("an entry without was (a page from before the guard) is written as before", () => {
+  eq(as("Phone C", "save", { week: "Nov 6", startingStack: 250, entries: [{ name: "Mo R.", value: 260 }] }).saved, 1);
+  eq(nov6("Mo R."), 10);
+});
+ok("missing bags, take-backs and approvals are in the History too", () => {
+  const actions = G.__history().g.slice(1).filter(Boolean).map((x) => x[6]);
+  for (const a of ["no bag", "check-in taken back", "approved log"]) assert.ok(actions.includes(a), a);
+  eq(G.__history().g.slice(1).find((x) => x && x[6] === "no bag" && x[2] === "Fresh Joiner").slice(3, 6), ["", -250, 250]);
+});
+ok("the board tool gets the History by week, and the public feed gets none of it", () => {
+  const h = admin("load").data.history["Nov 6"].filter((x) => x.name === "Late");
+  eq(h.map((x) => [x.before, x.after, x.by, x.action]), [[null, 250, "Phone B", "board save"], [250, 200, "Phone A", "board save"]]);
+  assert.ok(!JSON.stringify(get()).includes("Phone B"));
+});
+ok("set up adds the History tab with headers", () => {
+  G.setupSheet();
+  eq(G.__history().g[0], ["When", "Week", "Player", "Before", "After", "Stack", "Action", "By"]);
 });
 G.nightDate_ = realNight;
 ok("the board tool defaults to a 250 chip starting stack, and a saved 0 sticks", () => {

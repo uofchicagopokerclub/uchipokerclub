@@ -32,7 +32,10 @@
     Nothing is emailed: the script has no permission to send mail.
   - Mailing-list sign-ups from the site footer go to the Mailing list tab: any email, de-duplicated,
     capped, and never readable from the web.
-  - Every write lands in the Log tab. File > Version history restores anything.
+  - Every write lands in the Log tab, naming each player whose result changed and the number entered. Every change
+    to a result also gets a row in the History tab: before, after, who, when. File > Version history restores anything.
+  - Two board phones cannot silently overwrite each other: a save that would replace a result changed since the
+    tool loaded it is refused for that player and shown to the board (see saveWeek_).
 
   After editing this file: Deploy > Manage deployments > edit > Version: New version. The URL stays the same.
 */
@@ -44,6 +47,7 @@ var LIST_NAME = "Mailing list";
 var SPONSOR_NAME = "Sponsor inquiries";
 var SUBMIT_NAME = "Submissions";
 var CHECKIN_NAME = "Check-ins";
+var HISTORY_NAME = "History";
 var TIME_ZONE = "America/Chicago"; // meeting days are Chicago dates
 // Shown to visitors when a form cannot take their details. This script never sends email.
 var CLUB_EMAIL = "UofChicagoPokerClub@gmail.com";
@@ -106,6 +110,7 @@ function setupSheet() {
   var submissions = submitSheet_();
   submissions.getRange(1, 3, submissions.getMaxRows(), 2).setNumberFormat("@"); // rows added since creation too
   checkinSheet_();
+  historySheet_();
   ss.toast("Ledger sheet is ready." + (repaired ? " Fixed the column order of " + repaired + " mailing list row" + (repaired === 1 ? "." : "s.") : ""), "Ledger");
 }
 
@@ -712,7 +717,8 @@ function getAdminData_() {
     players: t.players.map(function (p) { return { name: p.name, results: p.results }; }), // never emails
     submissions: subs.pending,
     handled: subs.handled,
-    checkins: boardCheckins_(t.weeks)
+    checkins: boardCheckins_(t.weeks),
+    history: boardHistory_(t.weeks)
   };
 }
 
@@ -747,7 +753,11 @@ function setCheckin_(week, name, on, by) {
     var fresh = readTable_(), p = indexOfKey_(fresh.players.map(function (x) { return x.name; }), player);
     var cell = p >= 0 ? fresh.sheet.getRange(fresh.players[p].row + 2, fresh.fixed + w + 1) : null;
     var cleared = Boolean(cell) && mine.noBag !== null && fresh.players[p].results[w] === mine.noBag;
-    if (cleared) { cell.setValue(""); clearCache_(); }
+    if (cleared) {
+      cell.setValue("");
+      addHistory_([[new Date(), label, player, mine.noBag, null, -mine.noBag, "check-in taken back", by]]);
+      clearCache_();
+    }
     c.sheet.getRange(mine.row + 2, 5, 1, 4).setValues([["removed", safe_(by), new Date(), ""]]);
     return { ok: true, name: player, week: label, removed: true, cleared: cleared };
   });
@@ -787,11 +797,13 @@ function noBags_(week, startingStack, names, by) {
         c.sheet.getRange(checked[key_(p.name)].row + 2, 8).setValue(-start);
       });
       range.setValues(column);
+      var now = new Date();
+      addHistory_(mark.map(function (p) { return [now, label, p.name, null, -start, start, "no bag", by]; }));
       clearCache_();
     }
     return { ok: true, week: label, names: mark.map(function (p) { return p.name; }), marked: mark.length };
   });
-  if (done.marked) log_("no bag, 0 chips", done.week + ": " + done.names.join(", "), by);
+  if (done.marked) log_("no bag, 0 chips", done.week + ": " + done.names.join(", ") + " (each 0 chips, -" + start + ")", by);
   return done;
 }
 
@@ -814,8 +826,15 @@ function boardSubmissions_(weeks) {
   return out;
 }
 
-// entries: [{ name, value }] where value is what was typed (a number) or null to clear the cell.
-// With a starting stack, values are end-of-night chip counts and the sheet stores count minus stack.
+// entries: [{ name, value, was }] where value is what was typed (a number) or null to clear the cell, and was is the
+// result the board tool was showing for that player (null for none). With a starting stack, values are end-of-night
+// chip counts and the sheet stores count minus stack.
+//
+// The double-entry guard: if a player's result in the Sheet is no longer the one the tool was showing, another board
+// phone (or someone in the Sheet) saved it since. That entry is not written; it comes back in conflicts with who saved
+// the number there now, so the board checks the bag. Saving again from the refreshed tool overwrites on purpose.
+// Typing the same count as is already there is not a conflict. An entry without was (a page from before the guard,
+// 2026-10-27) is written as before.
 function saveWeek_(week, entries, startingStack, by) {
   var start = Number(startingStack) || 0;
   if (!(start >= 0 && start <= MAX_CHIPS)) throw new Error("Starting stack must be between 0 and " + MAX_CHIPS + ".");
@@ -825,32 +844,140 @@ function saveWeek_(week, entries, startingStack, by) {
     var t = readTable_();
     var w = indexOfKey_(t.weeks, week);
     if (w < 0) throw new Error("No week called " + clean_(week) + ".");
-    if (!t.players.length) return { ok: true, saved: 0, cleared: 0, missing: [], week: t.weeks[w] };
+    var label = t.weeks[w];
+    if (!t.players.length) return { ok: true, saved: 0, cleared: 0, missing: [], conflicts: [], week: label };
 
     var range = t.sheet.getRange(2, t.fixed + w + 1, t.rowCount, 1);
     var column = range.getValues();
     var names = t.players.map(function (p) { return p.name; });
-    var saved = 0, cleared = 0, missing = [];
+    var saved = 0, cleared = 0, missing = [], conflicts = [], changes = [];
 
     entries.forEach(function (e) {
       if (!e || typeof e.name !== "string") throw new Error("Bad entry.");
       var i = indexOfKey_(names, e.name);
       if (i < 0) { missing.push(clean_(e.name).slice(0, 40)); return; }
-      var row = t.players[i].row;
-      if (e.value === null || e.value === "") { column[row][0] = ""; cleared++; return; }
-      var v = typeof e.value === "number" ? e.value : NaN;
-      if (!isFinite(v) || Math.abs(v) > MAX_CHIPS) throw new Error("Not a valid number for " + t.players[i].name + ".");
-      if (start && v < 0) throw new Error("Chip count for " + t.players[i].name + " cannot be negative.");
-      column[row][0] = start ? v - start : v;
-      saved++;
+      var p = t.players[i], before = num_(column[p.row][0]), after = null;
+      if (e.value !== null && e.value !== "") {
+        var v = typeof e.value === "number" ? e.value : NaN;
+        if (!isFinite(v) || Math.abs(v) > MAX_CHIPS) throw new Error("Not a valid number for " + p.name + ".");
+        if (start && v < 0) throw new Error("Chip count for " + p.name + " cannot be negative.");
+        after = start ? v - start : v;
+      }
+      if ("was" in e && !sameResult_(before, e.was) && !sameResult_(before, after)) {
+        conflicts.push({ name: p.name, now: before });
+        return;
+      }
+      if (after === null) cleared++; else saved++;
+      if (sameResult_(before, after)) return;
+      column[p.row][0] = after === null ? "" : after;
+      changes.push({ name: p.name, before: before, after: after });
     });
 
-    range.setValues(column);
+    if (changes.length) {
+      range.setValues(column);
+      var now = new Date();
+      addHistory_(changes.map(function (c) { return [now, label, c.name, c.before, c.after, start, "board save", by]; }));
+    }
+    if (conflicts.length) {
+      var last = lastChanges_(label);
+      conflicts.forEach(function (c) {
+        // Named only when that change is what the Sheet holds now; a number typed into the Sheet has no author here.
+        var h = last[key_(c.name)];
+        if (h && sameResult_(h.after, c.now)) { c.by = h.by; c.at = iso_(h.at); }
+      });
+    }
     setProp_("startingStack", String(start));
     clearCache_();
-    log_("results", t.weeks[w] + ": " + saved + " saved, " + cleared + " cleared", by);
-    return { ok: true, saved: saved, cleared: cleared, missing: missing, week: t.weeks[w] };
+    var detail = changes.map(function (c) { return c.name + " " + changeText_(c.before, c.after, start); });
+    if (conflicts.length) {
+      detail.push("not saved, changed on another phone first: " + conflicts.map(function (c) { return c.name; }).join(", "));
+    }
+    log_("results", label + ": " + (detail.length ? detail.join("; ") : "no changes"), by);
+    return { ok: true, saved: saved, cleared: cleared, missing: missing, conflicts: conflicts, week: label };
   });
+}
+
+// Same result: both blank, or the same number. A blank cell and a missing was both read as no result.
+function sameResult_(a, b) { return num_(a) === num_(b); }
+
+// "300 chips, +50" with a starting stack, "+50" without, and the result it replaced: "(was -20)".
+function resultText_(v, start) {
+  if (v === null) return "no result";
+  var net = (v > 0 ? "+" : "") + v;
+  return start ? (v + start) + " chips, " + net : net;
+}
+function changeText_(before, after, start) {
+  var now = after === null ? "cleared" : resultText_(after, start);
+  return before === null ? now : now + " (was " + (before > 0 ? "+" : "") + before + ")";
+}
+
+/* ---------- History: every change to a result ---------- */
+
+// Columns: 1 When, 2 Week, 3 Player, 4 Before, 5 After (results, blank for none), 6 Stack (0 when the board typed
+// profit or loss), 7 Action (board save, no bag, approved log, check-in taken back), 8 By.
+var HISTORY_HEADER = ["When", "Week", "Player", "Before", "After", "Stack", "Action", "By"];
+
+function historySheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(HISTORY_NAME);
+  if (sheet) return sheet;
+  try {
+    sheet = ss.insertSheet(HISTORY_NAME);
+  } catch (err) {
+    // Another request created it a moment ago.
+    sheet = ss.getSheetByName(HISTORY_NAME);
+    if (!sheet) throw err;
+    return sheet;
+  }
+  sheet.getRange(1, 1, 1, HISTORY_HEADER.length).setValues([HISTORY_HEADER]).setFontWeight("bold");
+  sheet.getRange(1, 2, sheet.getMaxRows(), 2).setNumberFormat("@"); // week and player stay literal text
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+// rows: [when, week, player, before, after, stack, action, by], written in one call. Callers hold the lock.
+function addHistory_(rows) {
+  if (!rows.length) return;
+  var sheet = historySheet_();
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, HISTORY_HEADER.length).setValues(rows.map(function (r) {
+    return [r[0], safe_(r[1]), safe_(r[2]), r[3] === null ? "" : r[3], r[4] === null ? "" : r[4], r[5] || 0,
+      r[6], safe_(String(r[7] || ""))];
+  }));
+}
+
+function readHistory_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HISTORY_NAME);
+  if (!sheet) return [];
+  var n = sheet.getLastRow() - 1;
+  var values = n > 0 ? sheet.getRange(2, 1, n, HISTORY_HEADER.length).getValues() : [];
+  return values.map(function (r) {
+    return { at: r[0], week: weekText_(r[1]), name: clean_(r[2]), before: num_(r[3]), after: num_(r[4]),
+      stack: num_(r[5]) || 0, action: clean_(r[6]), by: clean_(r[7]) };
+  });
+}
+
+// The newest change per player for one week, by name key.
+function lastChanges_(week) {
+  var out = {};
+  readHistory_().forEach(function (h) { if (key_(h.week) === key_(week)) out[key_(h.name)] = h; });
+  return out;
+}
+
+// Every change, per week, oldest first: { "Oct 30": [{ name, before, after, stack, action, by, at }] }. A problem with
+// the tab never keeps the board out of the tool.
+function boardHistory_(weeks) {
+  var out = {};
+  try {
+    readHistory_().forEach(function (h) {
+      var w = indexOfKey_(weeks, h.week);
+      if (w < 0) return;
+      (out[weeks[w]] = out[weeks[w]] || []).push({ name: h.name, before: h.before, after: h.after, stack: h.stack,
+        action: h.action, by: h.by, at: iso_(h.at) });
+    });
+  } catch (err) {
+    return {};
+  }
+  return out;
 }
 
 // A board member has seen the chips. Approve writes counted chips minus the stack the entry was logged against into
@@ -882,6 +1009,7 @@ function review_(id, decision, counted, by) {
     }
     var result = chips - (r.stack || STARTING_STACK);
     t.sheet.getRange(t.players[p].row + 2, t.fixed + w + 1).setValue(result);
+    addHistory_([[new Date(), t.weeks[w], t.players[p].name, null, result, r.stack || STARTING_STACK, "approved log", by]]);
     s.sheet.getRange(r.row + 2, 7, 1, 7).setValues([[result, "approved"].concat(keep, [chips, safe_(by), new Date()])]);
     clearCache_();
     return { ok: true, decision: "approve", name: r.name, week: r.week, result: result,
