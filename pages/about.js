@@ -66,6 +66,11 @@ export default function About({ now }) {
                 <p className="event-date">{formatDay(e.date)}</p>
                 <h3>{e.title}</h3>
                 <ul className="ticks">{e.points.map((p) => <li key={p}>{p}</li>)}</ul>
+                {e.link && (
+                  <div className="actions" style={{ marginTop: 12, marginBottom: 20 }}>
+                    <a className="btn btn-primary" href={e.link.href} target="_blank" rel="noopener noreferrer">{e.link.label}</a>
+                  </div>
+                )}
               </article>
             ))}
           </div>

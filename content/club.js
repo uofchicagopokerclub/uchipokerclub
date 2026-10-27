@@ -126,8 +126,9 @@ export const schedule = {
     { date: '2026-10-28', start: '00:00', end: '23:59', place: '', what: 'Citadel Securities Trading Challenge', event: true, inviteOnly: true },
     { date: '2026-10-30', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-06', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
-    { date: '2026-11-08', start: '10:30', end: '13:30', place: 'Ida Noyes Hall, Library and Lounge', what: 'Fall tournament', event: true },
     { date: '2026-11-13', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
+    // Moved from 2026-11-08 (Max, 2026-10-27). Time and room carried over from the Fall schedule email.
+    { date: '2026-11-15', start: '10:30', end: '13:30', place: 'Ida Noyes Hall, Library and Lounge', what: 'Fall tournament', event: true },
     { date: '2026-11-20', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
   ],
   afterLast: 'The Winter schedule goes up here once it is set.',
@@ -186,13 +187,14 @@ export const events = [
     ],
   },
   {
-    date: '2026-11-08',
+    date: '2026-11-15',
     title: 'Fall tournament',
     points: [
-      '48 seats. Some are selected from the advanced cohort. The rest are won through an online satellite that anyone in the club can enter.',
-      'A $1,000 prize pool paid out to the final table.',
-      'Registration details are coming soon.',
+      '100 seats. Some are selected from the advanced cohort. The rest are won through an online satellite that anyone in the club can enter.',
+      'A $15,000 guaranteed prize pool paid out to the final table.',
     ],
+    // The qualifier is the online satellite (Max, 2026-10-27).
+    link: { href: 'https://forms.gle/D4WyZAMU1FqzqRWa8', label: 'Sign up for the qualifier' },
   },
 ];
 
