@@ -127,8 +127,8 @@ export const schedule = {
     { date: '2026-10-30', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-06', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
     { date: '2026-11-13', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
-    // Moved from 2026-11-08 (Max, 2026-10-27). Time and room carried over from the Fall schedule email.
-    { date: '2026-11-15', start: '10:30', end: '13:30', place: 'Ida Noyes Hall, Library and Lounge', what: 'Fall tournament', event: true },
+    // Moved from 2026-11-08, 10:30 to 1:30 (Max, 2026-10-27 and 2026-10-28). Room carried over from the Fall schedule email.
+    { date: '2026-11-15', start: '12:45', end: '16:00', place: 'Ida Noyes Hall, Library and Lounge', what: 'Fall tournament', event: true },
     { date: '2026-11-20', start: '18:00', end: '20:00', place: 'Reynolds Club, Hutchinson Commons', what: 'Weekly meeting' },
   ],
   afterLast: 'The Winter schedule goes up here once it is set.',
