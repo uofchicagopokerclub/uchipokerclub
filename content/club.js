@@ -15,6 +15,9 @@ export const club = {
   email: 'UofChicagoPokerClub@gmail.com',
   instagram: { handle: '@UChicagoPokerClub', url: 'https://www.instagram.com/uchicagopokerclub/' },
   x: { handle: '@UChiPokerClub', url: 'https://x.com/UChiPokerClub' },
+  // The board's Google Form, titled "Anonymous Feedback". On 2026-10-29 it needed no sign-in and collected no email;
+  // keep it that way, because the site calls it anonymous.
+  feedback: { url: 'https://forms.gle/KErYq5L3FpXEiiF16', label: 'Anonymous feedback' },
   disclaimer: 'No money is wagered at any point. Chips are for scoring only.',
 };
 
@@ -244,6 +247,7 @@ export const contact = {
   title: 'Interested in learning more or becoming a sponsor?',
   sponsorTitle: 'Become a sponsor',
   sponsorText: 'Our 2026-2027 sponsorship prospectus covers partnership options and who our members are. Leave your details and a member of the board will reach out.',
+  feedbackText: 'Anything you would like us to change? Tell the board anonymously.',
 };
 
 export const mailingList = {

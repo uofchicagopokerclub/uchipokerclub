@@ -36,6 +36,13 @@ export default function Contact() {
               </a>
             </li>
           </ul>
+          <div className="feedback-row">
+            <div>
+              <h2 className="feedback-title">{club.feedback.label}</h2>
+              <p className="muted">{contact.feedbackText}</p>
+            </div>
+            <a className="btn btn-secondary" href={club.feedback.url} target="_blank" rel="noopener noreferrer">Give feedback</a>
+          </div>
         </div>
       </section>
 

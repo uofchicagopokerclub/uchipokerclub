@@ -285,6 +285,8 @@ main > :last-child { padding-bottom: 0; }
 .contact-list .kind { display: block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--maroon); margin-bottom: 8px; }
 .contact-list .value { font-size: clamp(1.0625rem, 0.95rem + 0.6vw, 1.375rem); font-weight: 700; overflow-wrap: break-word; }
 .contact-list a:hover .value { color: var(--maroon); text-decoration: underline; text-underline-offset: 4px; }
+.feedback-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; padding: 28px 0; border-bottom: 1px solid var(--rule); }
+.feedback-title { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--maroon); margin-bottom: 8px; }
 @media (max-width: 767px) {
   .contact-list { grid-template-columns: minmax(0, 1fr); }
   .contact-list li + li { border-left: 0; }
@@ -346,6 +348,7 @@ select.input {
   .footer-grid { grid-template-columns: minmax(0, 1fr); }
   .footer-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
   .footer-links a { display: flex; align-items: center; min-height: var(--tap); }
+  .footer-links li:last-child:nth-child(odd) { grid-column: 1 / -1; } /* an odd last link gets the full row, not a wrap */
 }
 @media (max-width: 479px) { .signup-row { grid-template-columns: minmax(0, 1fr); } .signup-row .wide { grid-column: auto; } }
 

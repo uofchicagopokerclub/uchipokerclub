@@ -26,6 +26,7 @@ export default function SiteFooter() {
           <li><a href={club.instagram.url} target="_blank" rel="noopener noreferrer">Instagram</a></li>
           <li><a href={club.x.url} target="_blank" rel="noopener noreferrer">X</a></li>
           <li><a href={`mailto:${club.email}`}>Email</a></li>
+          <li><a href={club.feedback.url} target="_blank" rel="noopener noreferrer">{club.feedback.label}</a></li>
         </ul>
       </div>
       <div className="wrap">
