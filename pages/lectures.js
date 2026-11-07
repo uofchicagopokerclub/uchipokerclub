@@ -1,5 +1,5 @@
 import Seo from '../components/Seo';
-import { lectures } from '../content/club';
+import { gtoWizard, lectures } from '../content/club';
 import { formatDay } from '../lib/schedule';
 
 export default function Lectures() {
@@ -17,6 +17,14 @@ export default function Lectures() {
             <p className="eyebrow">{lectures.term}</p>
             <h1 className="page-title">Lecture slides</h1>
             <p className="lead">{lectures.intro}</p>
+          </div>
+          <div className="feedback-row promo-row">
+            <div>
+              <h2 className="feedback-title">{gtoWizard.label}</h2>
+              <p className="muted">{gtoWizard.text}</p>
+              <p className="promo-code">Code <strong>{gtoWizard.code}</strong></p>
+            </div>
+            <a className="btn btn-secondary" href={gtoWizard.url} target="_blank" rel="noopener noreferrer">{gtoWizard.cta}</a>
           </div>
           <ol className="decks" reversed>
             {decks.map((d) => (

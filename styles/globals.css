@@ -287,6 +287,9 @@ main > :last-child { padding-bottom: 0; }
 .contact-list a:hover .value { color: var(--maroon); text-decoration: underline; text-underline-offset: 4px; }
 .feedback-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; padding: 28px 0; border-bottom: 1px solid var(--rule); }
 .feedback-title { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--maroon); margin-bottom: 8px; }
+.promo-row { margin-top: clamp(8px, 2vw, 20px); border-bottom: 0; }
+.promo-code { margin-top: 10px; font-size: 0.875rem; color: var(--muted); }
+.promo-code strong { margin-left: 6px; font-size: 1.125rem; letter-spacing: 0.08em; color: var(--ink); user-select: all; }
 @media (max-width: 767px) {
   .contact-list { grid-template-columns: minmax(0, 1fr); }
   .contact-list li + li { border-left: 0; }

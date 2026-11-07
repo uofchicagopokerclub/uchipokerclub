@@ -140,6 +140,16 @@ export const schedule = {
 // Slides from each week's strategy lecture, shown newest first. The PDFs live in public/lectures. Before a deck goes
 // up, its cover, chip log and socials slides come out, because they carry QR codes and the meeting code (Max,
 // 2026-10-27).
+// Partner discount, from the board's announcement email (2026-11-06). The email says the site carries the
+// most up-to-date code, so change it here when GTO Wizard issues a new one.
+export const gtoWizard = {
+  label: 'GTO Wizard partnership',
+  text: 'Members get 30% off GTO Wizard, the poker study tool, with our promo code. Questions about it: ask Levi Stein or Tad O\'Brien.',
+  code: 'UCHIPOKER',
+  url: 'https://app.gtowizard.com/code',
+  cta: 'Redeem on GTO Wizard',
+};
+
 export const lectures = {
   term: TERM,
   intro: 'Every meeting opens with a strategy lecture from the board. The slides from each week are here.',
