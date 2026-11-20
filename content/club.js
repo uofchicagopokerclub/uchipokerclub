@@ -235,7 +235,7 @@ export const sponsors = {
   cta: 'Become a sponsor',
   firms: [
     { name: 'Jane Street', logo: '/images/sponsors/jane-street.png', width: 424, height: 155, displayHeight: 40 },
-    { name: 'Citadel', logo: '/images/sponsors/citadel.png', width: 350, height: 198, displayHeight: 48 },
+    { name: 'Citadel and Citadel Securities', logo: '/images/sponsors/citadel-citsec.png', width: 538, height: 168, displayHeight: 56 },
     { name: 'Hudson River Trading', logo: '/images/sponsors/hrt.png', width: 292, height: 170, displayHeight: 42 },
     { name: 'Bridgewater', logo: '/images/sponsors/bridgewater.png', width: 345, height: 153, displayHeight: 40 },
     { name: 'Susquehanna', logo: '/images/sponsors/susquehanna.png', width: 546, height: 45, displayHeight: 18 },
